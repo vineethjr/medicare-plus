@@ -1,0 +1,230 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f5fbfa;
+  color: #12312f;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 8%;
+  background: white;
+}
+
+.logo {
+  font-size: 28px;
+  font-weight: 800;
+  color: #12312f;
+}
+
+.logo span {
+  color: #18a999;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  font-size: 15px;
+}
+
+.nav-links a:hover {
+  color: #18a999;
+}
+
+.login-btn,
+.primary-btn {
+  background: #18a999;
+  color: white;
+  padding: 12px 22px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.login-btn:hover,
+.primary-btn:hover {
+  background: #118579;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 50px;
+  padding: 90px 8%;
+  min-height: 550px;
+}
+
+.hero-content {
+  max-width: 570px;
+}
+
+.tagline {
+  color: #18a999;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  margin-bottom: 22px;
+}
+
+h1 {
+  font-size: clamp(42px, 6vw, 76px);
+  line-height: 1.08;
+  margin-bottom: 25px;
+}
+
+h1 span {
+  color: #18a999;
+}
+
+.description {
+  color: #5e7471;
+  font-size: 18px;
+  line-height: 1.7;
+  margin-bottom: 32px;
+}
+
+.hero-buttons {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.secondary-btn {
+  border: 1px solid #18a999;
+  color: #118579;
+  padding: 12px 22px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.secondary-btn:hover {
+  background: #e0f5f1;
+}
+
+.hero-visual {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 280px;
+}
+
+.health-card {
+  width: 300px;
+  padding: 45px 30px;
+  text-align: center;
+  border-radius: 24px;
+  background: #d9f3ed;
+  box-shadow: 0 20px 50px rgba(24, 169, 153, 0.15);
+}
+
+.health-icon {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 85px;
+  height: 85px;
+  margin-bottom: 22px;
+  border-radius: 50%;
+  background: #18a999;
+  color: white;
+  font-size: 42px;
+}
+
+.health-card h3 {
+  font-size: 23px;
+  margin-bottom: 12px;
+}
+
+.health-card p {
+  color: #5e7471;
+}
+
+.features {
+  padding: 70px 8%;
+  background: white;
+  text-align: center;
+}
+
+.features h2 {
+  font-size: 34px;
+  margin-bottom: 40px;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+}
+
+.feature-card {
+  padding: 30px;
+  border: 1px solid #dcece8;
+  border-radius: 16px;
+  background: #f8fdfc;
+}
+
+.feature-card h3 {
+  color: #118579;
+  margin-bottom: 14px;
+}
+
+.feature-card p {
+  color: #5e7471;
+  line-height: 1.6;
+}
+
+footer {
+  padding: 25px;
+  text-align: center;
+  background: #12312f;
+  color: white;
+}
+
+@media (max-width: 800px) {
+  .navbar {
+    padding: 20px;
+  }
+
+  .nav-links {
+    gap: 12px;
+  }
+
+  .nav-links a:not(.login-btn) {
+    display: none;
+  }
+
+  .hero {
+    flex-direction: column;
+    text-align: center;
+    padding: 60px 20px;
+  }
+
+  .hero-buttons {
+    justify-content: center;
+  }
+
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
