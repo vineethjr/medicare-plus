@@ -296,3 +296,48 @@
     padding: 25px 20px;
   }
 }
+
+.ai-filter-banner {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 25px;
+  padding: 16px 20px;
+  background: #e8f8f5;
+  border: 1px solid #bce5df;
+  border-radius: 14px;
+  color: #174b50;
+}
+
+.ai-filter-banner > span {
+  font-size: 25px;
+}
+
+.ai-filter-banner div {
+  flex: 1;
+}
+
+.ai-filter-banner strong {
+  color: #087f75;
+}
+
+.ai-filter-banner p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #617c82;
+}
+
+.ai-filter-banner button {
+  border: 1px solid #0d9488;
+  background: white;
+  color: #087f75;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ai-filter-banner button:hover {
+  background: #0d9488;
+  color: white;
+}

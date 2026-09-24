@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Dashboard.css";
 
@@ -5,6 +6,59 @@ function PatientDashboard() {
   const navigate = useNavigate();
 
   const user = JSON.parse(localStorage.getItem("user"));
+  const token = localStorage.getItem("token");
+
+  const [stats, setStats] = useState({
+    totalAppointments: 0,
+    confirmedAppointments: 0,
+    pendingAppointments: 0,
+  });
+
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  // ================================
+  // FETCH PATIENT STATISTICS
+  // ================================
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const response = await fetch(
+          "http://localhost:5000/api/appointments/patient/stats",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (response.ok) {
+          setStats(data);
+        } else {
+          console.error(data.message);
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load patient statistics:",
+          error
+        );
+      } finally {
+        setLoadingStats(false);
+      }
+    }
+
+    if (token) {
+      fetchStats();
+    } else {
+      setLoadingStats(false);
+    }
+  }, [token]);
+
+  // ================================
+  // LOGOUT
+  // ================================
 
   function handleLogout() {
     localStorage.removeItem("token");
@@ -15,203 +69,364 @@ function PatientDashboard() {
 
   return (
     <div className="dashboard-page">
-      {/* Sidebar */}
+
+      {/* =========================
+          SIDEBAR
+      ========================== */}
+
       <aside className="dashboard-sidebar">
+
         <div className="dashboard-logo">
           MediCare<span>+</span>
         </div>
 
-        <p className="sidebar-label">Patient Menu</p>
+        <p className="sidebar-label">
+          Patient Menu
+        </p>
 
         <button
           className="sidebar-link active"
-          onClick={() => navigate("/patient-dashboard")}
+          onClick={() =>
+            navigate("/patient-dashboard")
+          }
         >
           ◉ Dashboard
         </button>
 
         <button
           className="sidebar-link"
-          onClick={() => navigate("/find-doctor")}
+          onClick={() =>
+            navigate("/find-doctor")
+          }
         >
-          ⌕ Find a Doctor
+          ⚕ Find a Doctor
         </button>
 
         <button
           className="sidebar-link"
-          onClick={() => alert("Appointments feature coming soon.")}
+          onClick={() =>
+            navigate("/doctor-recommendation")
+          }
+        >
+          🤖 AI Doctor Recommendation
+        </button>
+
+        <button
+          className="sidebar-link"
+          onClick={() =>
+            navigate("/patient-appointments")
+          }
         >
           ◷ My Appointments
         </button>
 
         <button
           className="sidebar-link"
-          onClick={() => alert("Medical records feature coming soon.")}
+          onClick={() =>
+            alert(
+              "Medical records feature coming soon."
+            )
+          }
         >
           ▣ Medical Records
         </button>
 
-        <button
-          className="sidebar-link"
-          onClick={() => alert("Patient profile feature coming soon.")}
-        >
-          ⚙ My Profile
-        </button>
-
         <div className="sidebar-bottom">
+
           <button
             className="sidebar-link logout-link"
             onClick={handleLogout}
           >
             ↪ Logout
           </button>
+
         </div>
+
       </aside>
 
-      {/* Main Dashboard */}
+      {/* =========================
+          MAIN
+      ========================== */}
+
       <div className="dashboard-main">
-        {/* Topbar */}
+
+        {/* TOPBAR */}
+
         <header className="dashboard-topbar">
+
           <div className="topbar-heading">
-            <h2>Patient Dashboard</h2>
-            <p>Your healthcare overview</p>
+
+            <h2>
+              Patient Dashboard
+            </h2>
+
+            <p>
+              Your personal healthcare overview
+            </p>
+
           </div>
 
           <div className="topbar-user">
+
             <div className="user-avatar">
-              {user?.name?.charAt(0).toUpperCase() || "P"}
+
+              {user?.name
+                ?.charAt(0)
+                .toUpperCase() || "P"}
+
             </div>
 
             <div className="user-details">
-              <strong>{user?.name || "Patient"}</strong>
-              <span>Patient Account</span>
+
+              <strong>
+                {user?.name || "Patient"}
+              </strong>
+
+              <span>
+                Patient Account
+              </span>
+
             </div>
+
           </div>
+
         </header>
 
-        {/* Content */}
+        {/* CONTENT */}
+
         <main className="dashboard-content">
-          {/* Welcome Section */}
+
+          {/* WELCOME */}
+
           <section className="dashboard-welcome">
+
             <div>
-              <span className="welcome-label">Welcome back</span>
+
+              <span className="welcome-label">
+                Welcome back
+              </span>
 
               <h1>
-                Hello, {user?.name || "Patient"} 👋
+                Hello,{" "}
+                {user?.name || "Patient"} 👋
               </h1>
 
               <p>
-                Take care of your health with simple, reliable,
-                and accessible healthcare services.
+                Manage your appointments, find
+                doctors, and access your healthcare
+                services from one place.
               </p>
+
             </div>
 
-            <div className="welcome-icon">🩺</div>
+            <div className="welcome-icon">
+              🏥
+            </div>
+
           </section>
 
-          {/* Overview */}
+          {/* OVERVIEW */}
+
           <div className="dashboard-section-title">
-            <h3>Overview</h3>
-            <span>Your account summary</span>
+
+            <h3>
+              Overview
+            </h3>
+
+            <span>
+              Your healthcare summary
+            </span>
+
           </div>
 
+          {/* STATS */}
+
           <section className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-icon teal">📅</div>
 
-              <div>
-                <h4>Upcoming Appointments</h4>
-                <strong>0</strong>
-              </div>
-            </div>
+            {/* TOTAL */}
 
             <div className="stat-card">
-              <div className="stat-icon blue">👨‍⚕️</div>
+
+              <div className="stat-icon teal">
+                📅
+              </div>
 
               <div>
-                <h4>Consulted Doctors</h4>
-                <strong>0</strong>
+
+                <h4>
+                  Total Appointments
+                </h4>
+
+                <strong>
+                  {loadingStats
+                    ? "..."
+                    : stats.totalAppointments}
+                </strong>
+
               </div>
+
             </div>
+
+            {/* CONFIRMED */}
 
             <div className="stat-card">
-              <div className="stat-icon orange">📄</div>
+
+              <div className="stat-icon blue">
+                ✅
+              </div>
 
               <div>
-                <h4>Medical Records</h4>
-                <strong>0</strong>
+
+                <h4>
+                  Confirmed
+                </h4>
+
+                <strong>
+                  {loadingStats
+                    ? "..."
+                    : stats.confirmedAppointments}
+                </strong>
+
               </div>
+
             </div>
+
+            {/* PENDING */}
+
+            <div className="stat-card">
+
+              <div className="stat-icon orange">
+                ⏳
+              </div>
+
+              <div>
+
+                <h4>
+                  Pending
+                </h4>
+
+                <strong>
+                  {loadingStats
+                    ? "..."
+                    : stats.pendingAppointments}
+                </strong>
+
+              </div>
+
+            </div>
+
           </section>
 
-          {/* Quick Access */}
+          {/* QUICK ACCESS */}
+
           <div className="dashboard-section-title">
-            <h3>Quick Access</h3>
-            <span>Manage your healthcare</span>
+
+            <h3>
+              Quick Access
+            </h3>
+
+            <span>
+              Access your healthcare services
+            </span>
+
           </div>
 
           <section className="feature-grid">
-            {/* Find Doctor */}
-            <div className="feature-card">
-              <div className="feature-card-icon">👨‍⚕️</div>
 
-              <h3>Find a Doctor</h3>
+            {/* FIND DOCTOR */}
+
+            <div className="feature-card">
+
+              <div className="feature-card-icon">
+                ⚕
+              </div>
+
+              <h3>
+                Find a Doctor
+              </h3>
 
               <p>
-                Search for doctors based on specialization,
-                availability, and consultation needs.
-              </p>
-
-              <button
-                className="dashboard-button"
-                onClick={() => navigate("/find-doctor")}
-              >
-                Find Doctors →
-              </button>
-            </div>
-
-            {/* Appointments */}
-            <div className="feature-card">
-              <div className="feature-card-icon">📅</div>
-
-              <h3>My Appointments</h3>
-
-              <p>
-                View your upcoming consultations and manage
-                your appointment requests.
-              </p>
-
-              <button
-  className="dashboard-button"
-  onClick={() => navigate("/patient-appointments")}
->
-  View Appointments →
-</button>
-            </div>
-
-            {/* Medical Records */}
-            <div className="feature-card">
-              <div className="feature-card-icon">📋</div>
-
-              <h3>Medical Records</h3>
-
-              <p>
-                Access your medical history, prescriptions,
-                and consultation records.
+                Search for doctors by
+                specialization, hospital, or name.
               </p>
 
               <button
                 className="dashboard-button"
                 onClick={() =>
-                  alert("Medical records feature coming soon.")
+                  navigate("/find-doctor")
                 }
               >
-                View Records →
+                Find Doctor →
               </button>
+
             </div>
+
+            {/* AI RECOMMENDATION */}
+
+            <div className="feature-card">
+
+              <div className="feature-card-icon">
+                🤖
+              </div>
+
+              <h3>
+                AI Doctor Recommendation
+              </h3>
+
+              <p>
+                Describe your symptoms and get an
+                AI-assisted specialist recommendation.
+              </p>
+
+              <button
+                className="dashboard-button"
+                onClick={() =>
+                  navigate(
+                    "/doctor-recommendation"
+                  )
+                }
+              >
+                Check Symptoms →
+              </button>
+
+            </div>
+
+            {/* APPOINTMENTS */}
+
+            <div className="feature-card">
+
+              <div className="feature-card-icon">
+                📅
+              </div>
+
+              <h3>
+                My Appointments
+              </h3>
+
+              <p>
+                View your booked consultations and
+                track appointment status.
+              </p>
+
+              <button
+                className="dashboard-button"
+                onClick={() =>
+                  navigate(
+                    "/patient-appointments"
+                  )
+                }
+              >
+                View Appointments →
+              </button>
+
+            </div>
+
           </section>
+
         </main>
+
       </div>
+
     </div>
   );
 }

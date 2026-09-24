@@ -11,6 +11,7 @@ import DoctorProfile from "./pages/DoctorProfile";
 import FindDoctor from "./pages/FindDoctor";
 import DoctorAppointments from "./pages/DoctorAppointments";
 import PatientAppointments from "./pages/PatientAppointments";
+import DoctorRecommendation from "./pages/DoctorRecommendation";
 
 import "./index.css";
 
@@ -41,6 +42,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 <Route
   path="/patient-appointments"
   element={<PatientAppointments />}
+/>
+<Route
+  path="/doctor-recommendation"
+  element={<DoctorRecommendation />}
 />
       </Routes>
       
