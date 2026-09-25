@@ -20,6 +20,10 @@ function FindDoctor() {
   const [appointmentTime, setAppointmentTime] = useState("");
   const [symptoms, setSymptoms] = useState("");
 
+  // NEW: Consultation mode
+  const [consultationMode, setConsultationMode] =
+    useState("Offline");
+
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState("");
@@ -93,20 +97,17 @@ function FindDoctor() {
     const doctorHospital =
       doctor.hospital?.toLowerCase() || "";
 
-    // Normal search
     const matchesSearch =
       !searchText ||
       doctorName.includes(searchText) ||
       doctorSpecialization.includes(searchText) ||
       doctorHospital.includes(searchText);
 
-    // Manual specialization dropdown
     const matchesManualSpecialization =
       !specialization ||
       doctorSpecialization ===
         specialization.toLowerCase();
 
-    // AI specialization filter
     const matchesAISpecialization =
       !specializationFromAI ||
       doctorSpecialization ===
@@ -129,6 +130,9 @@ function FindDoctor() {
     setAppointmentDate("");
     setAppointmentTime("");
     setSymptoms("");
+
+    // Default consultation mode
+    setConsultationMode("Offline");
 
     setError("");
     setSuccess("");
@@ -180,6 +184,7 @@ function FindDoctor() {
             appointment_date: appointmentDate,
             appointment_time: appointmentTime,
             symptoms,
+            consultation_mode: consultationMode,
           }),
         }
       );
@@ -201,6 +206,7 @@ function FindDoctor() {
       setTimeout(() => {
         setSelectedDoctor(null);
         setSuccess("");
+        setConsultationMode("Offline");
       }, 1800);
     } catch (error) {
       setError(error.message);
@@ -511,6 +517,78 @@ function FindDoctor() {
                 }
                 required
               />
+
+              {/* =================================
+                  CONSULTATION MODE
+              ================================== */}
+
+              <div className="consultation-mode-section">
+
+                <label>
+                  Consultation Mode
+                </label>
+
+                <div className="consultation-mode-options">
+
+                  {/* ONLINE */}
+
+                  <button
+                    type="button"
+                    className={`mode-option ${
+                      consultationMode === "Online"
+                        ? "selected"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setConsultationMode("Online")
+                    }
+                  >
+                    <span className="mode-icon">
+                      💻
+                    </span>
+
+                    <div>
+                      <strong>
+                        Online
+                      </strong>
+
+                      <small>
+                        Consult from anywhere
+                      </small>
+                    </div>
+                  </button>
+
+                  {/* OFFLINE */}
+
+                  <button
+                    type="button"
+                    className={`mode-option ${
+                      consultationMode === "Offline"
+                        ? "selected"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setConsultationMode("Offline")
+                    }
+                  >
+                    <span className="mode-icon">
+                      🏥
+                    </span>
+
+                    <div>
+                      <strong>
+                        Offline
+                      </strong>
+
+                      <small>
+                        Visit the hospital
+                      </small>
+                    </div>
+                  </button>
+
+                </div>
+
+              </div>
 
               {/* Symptoms */}
 

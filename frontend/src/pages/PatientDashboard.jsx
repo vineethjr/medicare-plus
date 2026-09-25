@@ -84,6 +84,8 @@ function PatientDashboard() {
           Patient Menu
         </p>
 
+        {/* DASHBOARD */}
+
         <button
           className="sidebar-link active"
           onClick={() =>
@@ -92,6 +94,8 @@ function PatientDashboard() {
         >
           ◉ Dashboard
         </button>
+
+        {/* FIND DOCTOR */}
 
         <button
           className="sidebar-link"
@@ -102,6 +106,8 @@ function PatientDashboard() {
           ⚕ Find a Doctor
         </button>
 
+        {/* AI RECOMMENDATION */}
+
         <button
           className="sidebar-link"
           onClick={() =>
@@ -110,6 +116,8 @@ function PatientDashboard() {
         >
           🤖 AI Doctor Recommendation
         </button>
+
+        {/* APPOINTMENTS */}
 
         <button
           className="sidebar-link"
@@ -120,16 +128,18 @@ function PatientDashboard() {
           ◷ My Appointments
         </button>
 
+        {/* MEDICAL RECORDS */}
+
         <button
           className="sidebar-link"
           onClick={() =>
-            alert(
-              "Medical records feature coming soon."
-            )
+            navigate("/patient-medical-records")
           }
         >
           ▣ Medical Records
         </button>
+
+        {/* LOGOUT */}
 
         <div className="sidebar-bottom">
 
@@ -417,6 +427,36 @@ function PatientDashboard() {
                 }
               >
                 View Appointments →
+              </button>
+
+            </div>
+
+            {/* MEDICAL RECORDS */}
+
+            <div className="feature-card">
+
+              <div className="feature-card-icon">
+                📋
+              </div>
+
+              <h3>
+                Medical Records
+              </h3>
+
+              <p>
+                View your diagnosis, prescriptions,
+                doctor's notes and follow-up details.
+              </p>
+
+              <button
+                className="dashboard-button"
+                onClick={() =>
+                  navigate(
+                    "/patient-medical-records"
+                  )
+                }
+              >
+                View Medical Records →
               </button>
 
             </div>

@@ -271,3 +271,219 @@
     grid-template-columns: 1fr;
   }
 }
+
+.consultation-btn {
+  border: none;
+  background: #0d9488;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.2s ease;
+}
+
+.consultation-btn:hover {
+  background: #087f75;
+}
+
+.consultation-btn:active {
+  transform: scale(0.98);
+}
+
+/* ========================================
+   CONSULTATION MODE
+======================================== */
+
+.doctor-online-mode {
+  color: #0d9488;
+  font-weight: 700;
+}
+
+.doctor-offline-mode {
+  color: #475569;
+  font-weight: 700;
+}
+
+/* ========================================
+   ONLINE CONSULTATION
+======================================== */
+
+.doctor-online-box {
+  margin-top: 18px;
+  padding: 16px;
+
+  border-radius: 14px;
+
+  background: linear-gradient(
+    135deg,
+    #ecfeff,
+    #f0fdfa
+  );
+
+  border: 1px solid #99f6e4;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 18px;
+}
+
+.doctor-online-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.doctor-online-icon {
+  width: 46px;
+  height: 46px;
+
+  border-radius: 12px;
+
+  background: #ccfbf1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 23px;
+}
+
+.doctor-online-info strong {
+  display: block;
+
+  color: #115e59;
+
+  font-size: 15px;
+
+  margin-bottom: 3px;
+}
+
+.doctor-online-info p {
+  margin: 0;
+
+  color: #64748b;
+
+  font-size: 12px;
+}
+
+.start-consultation-btn {
+  border: none;
+
+  background: #0d9488;
+
+  color: white;
+
+  padding: 11px 17px;
+
+  border-radius: 8px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.start-consultation-btn:hover {
+  background: #087f75;
+
+  transform: translateY(-1px);
+}
+
+.action-start-btn {
+  margin-right: 8px;
+}
+
+.doctor-waiting-text {
+  color: #b45309;
+
+  font-size: 12px;
+
+  font-weight: 600;
+}
+
+.doctor-completed-text {
+  color: #15803d;
+
+  font-size: 12px;
+
+  font-weight: 600;
+}
+
+/* ========================================
+   OFFLINE CONSULTATION
+======================================== */
+
+.doctor-offline-box {
+  margin-top: 18px;
+
+  padding: 16px;
+
+  border-radius: 14px;
+
+  background: #f8fafc;
+
+  border: 1px solid #cbd5e1;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+}
+
+.doctor-offline-icon {
+  width: 46px;
+  height: 46px;
+
+  border-radius: 12px;
+
+  background: #e2e8f0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 23px;
+}
+
+.doctor-offline-box strong {
+  display: block;
+
+  color: #334155;
+
+  font-size: 15px;
+
+  margin-bottom: 3px;
+}
+
+.doctor-offline-box p {
+  margin: 0;
+
+  color: #64748b;
+
+  font-size: 12px;
+}
+
+/* ========================================
+   RESPONSIVE
+======================================== */
+
+@media (max-width: 700px) {
+
+  .doctor-online-box {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .start-consultation-btn {
+    width: 100%;
+  }
+
+  .doctor-offline-box {
+    align-items: flex-start;
+  }
+
+}

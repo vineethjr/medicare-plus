@@ -4,6 +4,10 @@ const db = new Database("database.sqlite");
 
 db.pragma("journal_mode = WAL");
 
+// ========================================
+// USERS TABLE
+// ========================================
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,6 +26,10 @@ db.exec(`
   )
 `);
 
+// ========================================
+// APPOINTMENTS TABLE
+// ========================================
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS appointments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,10 +46,49 @@ db.exec(`
   )
 `);
 
-function addColumnIfMissing(columnName, columnDefinition) {
+// ========================================
+// CONSULTATION RECORDS TABLE
+// ========================================
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS consultation_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    appointment_id INTEGER NOT NULL UNIQUE,
+
+    patient_id INTEGER NOT NULL,
+
+    doctor_id INTEGER NOT NULL,
+
+    diagnosis TEXT,
+
+    prescription TEXT,
+
+    doctor_notes TEXT,
+
+    follow_up_date TEXT,
+
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (appointment_id)
+      REFERENCES appointments(id),
+
+    FOREIGN KEY (patient_id)
+      REFERENCES users(id),
+
+    FOREIGN KEY (doctor_id)
+      REFERENCES users(id)
+  )
+`);
+
+// ========================================
+// DATABASE MIGRATION HELPER
+// ========================================
+
+function addColumnIfMissing(tableName, columnName, columnDefinition) {
   try {
     db.exec(
-      `ALTER TABLE users ADD COLUMN ${columnName} ${columnDefinition}`
+      `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`
     );
   } catch (error) {
     if (!error.message.includes("duplicate column name")) {
@@ -50,18 +97,33 @@ function addColumnIfMissing(columnName, columnDefinition) {
   }
 }
 
-/*
-  These migrations make sure existing users
-  also receive the new profile fields.
-*/
+// ========================================
+// USERS TABLE MIGRATIONS
+// ========================================
 
-addColumnIfMissing("specialization", "TEXT");
-addColumnIfMissing("qualification", "TEXT");
-addColumnIfMissing("experience", "INTEGER DEFAULT 0");
-addColumnIfMissing("consultation_fee", "INTEGER DEFAULT 0");
-addColumnIfMissing("hospital", "TEXT");
-addColumnIfMissing("bio", "TEXT");
-addColumnIfMissing("availability", "TEXT");
+addColumnIfMissing("users", "specialization", "TEXT");
+addColumnIfMissing("users", "qualification", "TEXT");
+addColumnIfMissing("users", "experience", "INTEGER DEFAULT 0");
+addColumnIfMissing("users", "consultation_fee", "INTEGER DEFAULT 0");
+addColumnIfMissing("users", "hospital", "TEXT");
+addColumnIfMissing("users", "bio", "TEXT");
+addColumnIfMissing("users", "availability", "TEXT");
+
+// ========================================
+// APPOINTMENTS TABLE MIGRATIONS
+// ========================================
+
+addColumnIfMissing(
+  "appointments",
+  "consultation_mode",
+  "TEXT DEFAULT 'Offline'"
+);
+
+addColumnIfMissing(
+  "appointments",
+  "meeting_link",
+  "TEXT"
+);
 
 console.log("SQLite database connected successfully");
 

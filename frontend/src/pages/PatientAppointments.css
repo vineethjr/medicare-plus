@@ -203,3 +203,298 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ========================================
+   CONSULTATION MODE
+======================================== */
+
+.online-mode {
+  color: #0d9488;
+  font-weight: 700;
+}
+
+.offline-mode {
+  color: #475569;
+  font-weight: 700;
+}
+
+/* ========================================
+   ONLINE CONSULTATION BOX
+======================================== */
+
+.online-consultation-box {
+  margin-top: 20px;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid #99f6e4;
+  background: linear-gradient(
+    135deg,
+    #ecfeff,
+    #f0fdfa
+  );
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.online-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.online-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #ccfbf1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 24px;
+}
+
+.online-info strong {
+  display: block;
+  color: #115e59;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.online-info p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.join-consultation-btn {
+  border: none;
+  background: #0d9488;
+  color: white;
+
+  padding: 12px 18px;
+  border-radius: 9px;
+
+  font-weight: 600;
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.join-consultation-btn:hover {
+  background: #087f75;
+  transform: translateY(-1px);
+}
+
+.waiting-consultation {
+  color: #b45309;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.completed-consultation {
+  color: #15803d;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ========================================
+   OFFLINE CONSULTATION BOX
+======================================== */
+
+.offline-consultation-box {
+  margin-top: 20px;
+  padding: 18px;
+
+  border-radius: 14px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.offline-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #e2e8f0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 24px;
+}
+
+.offline-consultation-box strong {
+  display: block;
+  color: #334155;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.offline-consultation-box p {
+  margin: 0 0 6px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.hospital-name {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ========================================
+   RESPONSIVE
+======================================== */
+
+@media (max-width: 700px) {
+  .online-consultation-box {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .join-consultation-btn {
+    width: 100%;
+  }
+}
+
+.confirmed-consultation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+}
+
+.consultation-time {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.time-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #ccfbf1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.consultation-time strong {
+  display: block;
+  color: #115e59;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.consultation-time p {
+  margin: 0;
+  color: #0f766e;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+@media (max-width: 700px) {
+  .confirmed-consultation {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .join-consultation-btn {
+    width: 100%;
+  }
+}
+/* ========================================
+   CONFIRMED ONLINE CONSULTATION
+======================================== */
+
+.confirmed-consultation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+}
+
+.consultation-time {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.time-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #ccfbf1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.consultation-time strong {
+  display: block;
+  color: #115e59;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.consultation-time p {
+  margin: 0;
+  color: #0f766e;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ========================================
+   BEFORE CONSULTATION TIME
+======================================== */
+
+.consultation-not-started {
+  padding: 11px 16px;
+  border-radius: 9px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+}
+
+/* ========================================
+   REJECTED
+======================================== */
+
+.rejected-consultation {
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ========================================
+   MOBILE
+======================================== */
+
+@media (max-width: 700px) {
+
+  .confirmed-consultation {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .join-consultation-btn {
+    width: 100%;
+  }
+
+}

@@ -23,6 +23,7 @@ router.post("/", protect, (req, res) => {
       appointment_date,
       appointment_time,
       symptoms,
+      consultation_mode,
     } = req.body;
 
     if (!doctor_id || !appointment_date || !appointment_time) {
@@ -31,6 +32,12 @@ router.post("/", protect, (req, res) => {
           "Doctor, appointment date and appointment time are required.",
       });
     }
+
+    // Allow only Online or Offline
+    const mode =
+      consultation_mode === "Online"
+        ? "Online"
+        : "Offline";
 
     const doctor = db
       .prepare(
@@ -46,6 +53,7 @@ router.post("/", protect, (req, res) => {
       });
     }
 
+    // First create the appointment
     const result = db
       .prepare(
         `INSERT INTO appointments
@@ -55,21 +63,40 @@ router.post("/", protect, (req, res) => {
           appointment_date,
           appointment_time,
           symptoms,
-          status
+          status,
+          consultation_mode
         )
-        VALUES (?, ?, ?, ?, ?, 'Pending')`
+        VALUES (?, ?, ?, ?, ?, 'Pending', ?)`
       )
       .run(
         req.user.id,
         doctor_id,
         appointment_date,
         appointment_time,
-        symptoms || ""
+        symptoms || "",
+        mode
       );
+
+    const appointmentId = result.lastInsertRowid;
+
+    // Generate internal consultation room for Online appointments
+    let meetingLink = null;
+
+    if (mode === "Online") {
+      meetingLink = `http://localhost:5173/online-consultation/${appointmentId}`;
+
+      db.prepare(
+        `UPDATE appointments
+         SET meeting_link = ?
+         WHERE id = ?`
+      ).run(meetingLink, appointmentId);
+    }
 
     res.status(201).json({
       message: "Appointment request submitted successfully.",
-      appointmentId: result.lastInsertRowid,
+      appointmentId,
+      consultationMode: mode,
+      meetingLink,
     });
   } catch (error) {
     console.error("Booking error:", error);
@@ -102,6 +129,8 @@ router.get("/patient", protect, (req, res) => {
           appointments.appointment_time,
           appointments.symptoms,
           appointments.status,
+          appointments.consultation_mode,
+          appointments.meeting_link,
           appointments.created_at,
 
           users.name AS doctor_name,
@@ -154,6 +183,8 @@ router.get("/doctor", protect, (req, res) => {
           appointments.appointment_time,
           appointments.symptoms,
           appointments.status,
+          appointments.consultation_mode,
+          appointments.meeting_link,
           appointments.created_at,
 
           users.name AS patient_name,
@@ -196,10 +227,8 @@ router.get("/doctor/stats", protect, (req, res) => {
       });
     }
 
-    // Today's date in YYYY-MM-DD format
     const today = new Date().toISOString().split("T")[0];
 
-    // Today's appointments
     const todayAppointments = db
       .prepare(
         `SELECT COUNT(*) AS count
@@ -210,7 +239,6 @@ router.get("/doctor/stats", protect, (req, res) => {
       )
       .get(req.user.id, today).count;
 
-    // Total unique patients
     const totalPatients = db
       .prepare(
         `SELECT COUNT(DISTINCT patient_id) AS count
@@ -219,7 +247,6 @@ router.get("/doctor/stats", protect, (req, res) => {
       )
       .get(req.user.id).count;
 
-    // Pending appointment requests
     const pendingRequests = db
       .prepare(
         `SELECT COUNT(*) AS count

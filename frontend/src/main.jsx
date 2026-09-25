@@ -12,6 +12,10 @@ import FindDoctor from "./pages/FindDoctor";
 import DoctorAppointments from "./pages/DoctorAppointments";
 import PatientAppointments from "./pages/PatientAppointments";
 import DoctorRecommendation from "./pages/DoctorRecommendation";
+import DoctorConsultation from "./pages/DoctorConsultation";
+import PatientMedicalRecords from "./pages/PatientMedicalRecords";
+import DoctorMedicalRecords from "./pages/DoctorMedicalRecords";
+import OnlineConsultation from "./pages/OnlineConsultation";
 
 import "./index.css";
 
@@ -46,6 +50,22 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 <Route
   path="/doctor-recommendation"
   element={<DoctorRecommendation />}
+/>
+<Route
+  path="/doctor-consultation"
+  element={<DoctorConsultation />}
+/>
+<Route
+  path="/patient-medical-records"
+  element={<PatientMedicalRecords />}
+/>
+<Route
+  path="/doctor-medical-records"
+  element={<DoctorMedicalRecords />}
+/>
+<Route
+  path="/online-consultation/:appointmentId"
+  element={<OnlineConsultation />}
 />
       </Routes>
       
