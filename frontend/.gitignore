@@ -34,3 +34,11 @@ database.sqlite
 database.sqlite-shm
 database.sqlite-wal
 dist/
+
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+build/
+.DS_Store

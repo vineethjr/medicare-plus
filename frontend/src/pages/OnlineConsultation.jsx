@@ -1,922 +1,741 @@
-import { useEffect, useRef, useState } from "react";
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import "./OnlineConsultation.css";
 
+const API_URL = "http://localhost:5000/api";
 const SOCKET_URL = "http://localhost:5000";
 
 const rtcConfiguration = {
   iceServers: [
-    {
-      urls: "stun:stun.l.google.com:19302",
-    },
+    { urls: "stun:stun.l.google.com:19302" },
   ],
 };
 
-function OnlineConsultation() {
-  const navigate = useNavigate();
-  const { appointmentId } = useParams();
+function readUser() {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "{}");
+  } catch {
+    return {};
+  }
+}
 
+function OnlineConsultation() {
+  const { appointmentId } = useParams();
+  const navigate = useNavigate();
+
+  const [user] = useState(readUser);
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [mediaError, setMediaError] = useState("");
 
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
-
-  const [chatOpen, setChatOpen] = useState(false);
-  const [mediaError, setMediaError] = useState("");
-
   const [participantConnected, setParticipantConnected] =
     useState(false);
 
+  const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [chatError, setChatError] = useState("");
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-
   const localStreamRef = useRef(null);
+  const screenStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const socketRef = useRef(null);
+  const appointmentRef = useRef(null);
 
   const token = localStorage.getItem("token");
+  const isDoctor = user.role === "doctor";
 
-  const user = JSON.parse(
-    localStorage.getItem("user") || "{}"
-  );
+  const authHeaders = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
 
-  // ========================================
-  // FETCH APPOINTMENT
-  // ========================================
+  // --------------------------------------------------
+  // FETCH AND VERIFY APPOINTMENT
+  // --------------------------------------------------
 
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchAppointment() {
       try {
         setLoading(true);
         setError("");
 
-        if (!token) {
-          throw new Error(
-            "Please login to access the consultation."
-          );
+        if (!token || !user.id || !user.role) {
+          throw new Error("Please log in to join the consultation.");
         }
 
-        const role =
-          user.role === "doctor"
-            ? "doctor"
-            : "patient";
+        if (!["doctor", "patient"].includes(user.role)) {
+          throw new Error("Your account cannot join this consultation.");
+        }
 
         const response = await fetch(
-          `${SOCKET_URL}/api/appointments/${role}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+          `${API_URL}/appointments/${user.role}`,
+          { headers: authHeaders }
         );
 
         const data = await response.json();
 
         if (!response.ok) {
           throw new Error(
-            data.message ||
-              "Failed to load consultation."
+            data.message || "Could not load your appointments."
           );
         }
 
-        const foundAppointment = data.find(
-          (item) =>
-            String(item.id) ===
-            String(appointmentId)
-        );
+        const found = Array.isArray(data)
+          ? data.find(
+              (item) => String(item.id) === String(appointmentId)
+            )
+          : null;
 
-        if (!foundAppointment) {
+        if (!found) {
           throw new Error(
-            "Appointment not found."
+            "Appointment not found or you do not have access to it."
           );
         }
 
-        if (
-          foundAppointment.consultation_mode !==
-          "Online"
-        ) {
+        if (found.consultation_mode !== "Online") {
           throw new Error(
             "This appointment is not an online consultation."
           );
         }
 
-        setAppointment(foundAppointment);
-      } catch (error) {
-        console.error(
-          "Consultation error:",
-          error
-        );
+        if (
+          ["Cancelled", "Rejected"].includes(found.status)
+        ) {
+          throw new Error(
+            `This appointment is ${found.status.toLowerCase()}.`
+          );
+        }
 
-        setError(error.message);
+        if (!cancelled) {
+          appointmentRef.current = found;
+          setAppointment(found);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message || "Unable to load the consultation.");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     fetchAppointment();
-  }, [appointmentId, token, user.role]);
 
-  // ========================================
-  // CREATE PEER CONNECTION
-  // ========================================
+    return () => {
+      cancelled = true;
+    };
+    // authHeaders is intentionally not a dependency; token/user identity
+    // changes are represented by the primitive dependencies below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointmentId, token, user.id, user.role]);
+
+  // --------------------------------------------------
+  // PERSISTENT CHAT
+  // Requires GET and POST /api/appointments/:id/messages
+  // --------------------------------------------------
+
+  const fetchMessages = useCallback(async () => {
+    if (!token || !appointmentId) return;
+
+    try {
+      const response = await fetch(
+        `${API_URL}/appointments/${appointmentId}/messages`,
+        { headers: authHeaders }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Could not load messages.");
+      }
+
+      const list = Array.isArray(data) ? data : data.messages || [];
+
+      setMessages((previous) => {
+        const byId = new Map();
+
+        [...previous, ...list].forEach((message, index) => {
+          const key = message.id ?? `${message.user_id}-${message.created_at}-${index}`;
+          byId.set(String(key), message);
+        });
+
+        return [...byId.values()].sort((a, b) => {
+          const timeA = new Date(a.created_at || 0).getTime();
+          const timeB = new Date(b.created_at || 0).getTime();
+          return timeA - timeB;
+        });
+      });
+
+      setChatError("");
+    } catch (err) {
+      setChatError(err.message || "Unable to load chat messages.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointmentId, token]);
+
+  useEffect(() => {
+    if (!appointment) return;
+
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 3000);
+
+    return () => clearInterval(interval);
+  }, [appointment, fetchMessages]);
+
+  async function sendMessage(event) {
+    event?.preventDefault();
+
+    const message = messageText.trim();
+
+    if (!message || sendingMessage) return;
+
+    try {
+      setSendingMessage(true);
+      setChatError("");
+
+      const response = await fetch(
+        `${API_URL}/appointments/${appointmentId}/messages`,
+        {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({ message }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Message could not be sent.");
+      }
+
+      const savedMessage = data.message || data;
+
+      if (savedMessage.id != null) {
+        setMessages((previous) => {
+          const exists = previous.some(
+            (item) => String(item.id) === String(savedMessage.id)
+          );
+
+          return exists ? previous : [...previous, savedMessage];
+        });
+      } else {
+        await fetchMessages();
+      }
+
+      setMessageText("");
+      await fetchMessages();
+    } catch (err) {
+      setChatError(err.message || "Message could not be sent.");
+    } finally {
+      setSendingMessage(false);
+    }
+  }
+
+  // --------------------------------------------------
+  // WEBRTC PEER CONNECTION
+  // --------------------------------------------------
 
   function createPeerConnection() {
     if (peerConnectionRef.current) {
       return peerConnectionRef.current;
     }
 
-    const peerConnection =
-      new RTCPeerConnection(
-        rtcConfiguration
-      );
+    const pc = new RTCPeerConnection(rtcConfiguration);
+    peerConnectionRef.current = pc;
 
-    peerConnectionRef.current =
-      peerConnection;
-
-    // Add local camera and microphone
     if (localStreamRef.current) {
-      localStreamRef.current
-        .getTracks()
-        .forEach((track) => {
-          peerConnection.addTrack(
-            track,
-            localStreamRef.current
-          );
-        });
+      localStreamRef.current.getTracks().forEach((track) => {
+        pc.addTrack(track, localStreamRef.current);
+      });
     }
 
-    // Receive remote tracks
-    peerConnection.ontrack = (event) => {
-      console.log(
-        "Remote media received"
-      );
-
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject =
-          event.streams[0];
+    pc.ontrack = (event) => {
+      if (remoteVideoRef.current && event.streams[0]) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+        remoteVideoRef.current.play().catch(() => {});
       }
 
       setParticipantConnected(true);
     };
 
-    // Send ICE candidates
-    peerConnection.onicecandidate = (
-      event
-    ) => {
-      if (
-        event.candidate &&
-        socketRef.current
-      ) {
-        socketRef.current.emit(
-          "ice-candidate",
-          {
-            appointmentId,
-            candidate: event.candidate,
-          }
-        );
+    pc.onicecandidate = (event) => {
+      if (event.candidate && socketRef.current?.connected) {
+        socketRef.current.emit("ice-candidate", {
+          appointmentId,
+          candidate: event.candidate,
+        });
       }
     };
 
-    peerConnection.onconnectionstatechange =
-      () => {
-        console.log(
-          "WebRTC connection state:",
-          peerConnection.connectionState
-        );
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
 
-        if (
-          peerConnection.connectionState ===
-          "connected"
-        ) {
-          setParticipantConnected(true);
-        }
+      setParticipantConnected(state === "connected");
 
-        if (
-          peerConnection.connectionState ===
-            "disconnected" ||
-          peerConnection.connectionState ===
-            "failed" ||
-          peerConnection.connectionState ===
-            "closed"
-        ) {
-          setParticipantConnected(false);
-        }
-      };
+      if (["failed", "closed"].includes(state)) {
+        setParticipantConnected(false);
+      }
+    };
 
-    return peerConnection;
+    return pc;
   }
 
-  // ========================================
-  // START MEDIA
-  // ========================================
+  // --------------------------------------------------
+  // CAMERA AND MICROPHONE
+  // --------------------------------------------------
 
   async function startMedia() {
     try {
       setMediaError("");
 
-      if (!navigator.mediaDevices) {
+      if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error(
-          "Camera and microphone are not supported by this browser."
+          "Camera access requires a supported browser and a secure connection."
         );
       }
 
-      const stream =
-        await navigator.mediaDevices.getUserMedia(
-          {
-            video: true,
-            audio: true,
-          }
-        );
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
 
       localStreamRef.current = stream;
 
       if (localVideoRef.current) {
-        localVideoRef.current.srcObject =
-          stream;
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.muted = true;
+        localVideoRef.current.play().catch(() => {});
       }
 
-      return stream;
-    } catch (error) {
-      console.error(
-        "Media permission error:",
-        error
-      );
+      setCameraOn(stream.getVideoTracks().some((track) => track.enabled));
+      setMicOn(stream.getAudioTracks().some((track) => track.enabled));
 
+      return stream;
+    } catch (err) {
       setMediaError(
-        "Camera or microphone permission was denied. Please allow access in your browser."
+        err.name === "NotAllowedError"
+          ? "Camera or microphone permission was denied. Allow access in your browser settings."
+          : err.message || "Unable to access the camera or microphone."
       );
 
       setMicOn(false);
       setCameraOn(false);
-
       return null;
     }
   }
 
-  // ========================================
-  // SOCKET + WEBRTC
-  // ========================================
+  // --------------------------------------------------
+  // SOCKET.IO SIGNALING
+  // Only the doctor creates the initial offer.
+  // --------------------------------------------------
 
   useEffect(() => {
-    if (!appointment) {
-      return;
-    }
+    if (!appointment || !token) return;
 
     let cancelled = false;
+    let socket;
 
-    async function startConsultation() {
+    async function connectConsultation() {
       try {
-        // First start camera/microphone
-        const stream =
-          await startMedia();
+        const stream = await startMedia();
 
         if (cancelled) {
+          stream?.getTracks().forEach((track) => track.stop());
           return;
         }
 
-        // Connect Socket.IO
-        const socket = io(SOCKET_URL);
+        socket = io(SOCKET_URL, {
+          transports: ["websocket", "polling"],
+        });
 
         socketRef.current = socket;
 
-        // ==================================
-        // SOCKET CONNECTED
-        // ==================================
-
         socket.on("connect", () => {
-          console.log(
-            "Connected to signaling server:",
-            socket.id
-          );
-
-          socket.emit(
-            "join-consultation",
-            {
-              appointmentId,
-              user: {
-                id: user.id,
-                name: user.name,
-                role: user.role,
-              },
-            }
-          );
+          socket.emit("join-consultation", {
+            appointmentId,
+            user: {
+              id: user.id,
+              name: user.name,
+              role: user.role,
+            },
+          });
         });
 
-        // ==================================
-        // PARTICIPANT JOINED
-        // ==================================
+        socket.on("room-status", async ({ participantCount }) => {
+          const connected = participantCount > 1;
+          setParticipantConnected(connected);
 
-        socket.on(
-          "participant-joined",
-          async () => {
-            console.log(
-              "Other participant joined"
+          if (!connected || !isDoctor) return;
+
+          const pc = createPeerConnection();
+
+          // Avoid creating a second offer if negotiation already started.
+          if (
+            pc.signalingState !== "stable" ||
+            pc.localDescription
+          ) {
+            return;
+          }
+
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            socket.emit("webrtc-offer", {
+              appointmentId,
+              offer: pc.localDescription,
+            });
+          } catch (err) {
+            console.error("Could not create WebRTC offer:", err);
+          }
+        });
+
+        socket.on("participant-joined", async () => {
+          setParticipantConnected(true);
+
+          // The doctor is the designated offer creator. This prevents
+          // both users from sending competing offers.
+          if (!isDoctor) return;
+
+          const pc = createPeerConnection();
+
+          if (pc.signalingState !== "stable" || pc.localDescription) {
+            return;
+          }
+
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            socket.emit("webrtc-offer", {
+              appointmentId,
+              offer: pc.localDescription,
+            });
+          } catch (err) {
+            console.error("Offer creation failed:", err);
+          }
+        });
+
+        socket.on("webrtc-offer", async ({ offer }) => {
+          if (isDoctor) return;
+
+          try {
+            const pc = createPeerConnection();
+
+            await pc.setRemoteDescription(
+              new RTCSessionDescription(offer)
             );
 
-            setParticipantConnected(true);
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
 
-            const peerConnection =
-              createPeerConnection();
-
-            try {
-              const offer =
-                await peerConnection.createOffer();
-
-              await peerConnection.setLocalDescription(
-                offer
-              );
-
-              socket.emit(
-                "webrtc-offer",
-                {
-                  appointmentId,
-                  offer,
-                }
-              );
-            } catch (error) {
-              console.error(
-                "Offer error:",
-                error
-              );
-            }
+            socket.emit("webrtc-answer", {
+              appointmentId,
+              answer: pc.localDescription,
+            });
+          } catch (err) {
+            console.error("Could not process WebRTC offer:", err);
           }
-        );
+        });
 
-        // ==================================
-        // RECEIVE OFFER
-        // ==================================
+        socket.on("webrtc-answer", async ({ answer }) => {
+          if (!isDoctor) return;
 
-        socket.on(
-          "webrtc-offer",
-          async ({ offer }) => {
-            console.log(
-              "Received WebRTC offer"
+          const pc = peerConnectionRef.current;
+          if (!pc || pc.signalingState !== "have-local-offer") return;
+
+          try {
+            await pc.setRemoteDescription(
+              new RTCSessionDescription(answer)
             );
-
-            const peerConnection =
-              createPeerConnection();
-
-            try {
-              await peerConnection.setRemoteDescription(
-                new RTCSessionDescription(
-                  offer
-                )
-              );
-
-              const answer =
-                await peerConnection.createAnswer();
-
-              await peerConnection.setLocalDescription(
-                answer
-              );
-
-              socket.emit(
-                "webrtc-answer",
-                {
-                  appointmentId,
-                  answer,
-                }
-              );
-            } catch (error) {
-              console.error(
-                "Answer error:",
-                error
-              );
-            }
+          } catch (err) {
+            console.error("Could not process WebRTC answer:", err);
           }
-        );
+        });
 
-        // ==================================
-        // RECEIVE ANSWER
-        // ==================================
+        socket.on("ice-candidate", async ({ candidate }) => {
+          const pc = peerConnectionRef.current;
 
-        socket.on(
-          "webrtc-answer",
-          async ({ answer }) => {
-            console.log(
-              "Received WebRTC answer"
+          if (!pc || !candidate) return;
+
+          try {
+            await pc.addIceCandidate(
+              new RTCIceCandidate(candidate)
             );
-
-            const peerConnection =
-              peerConnectionRef.current;
-
-            if (!peerConnection) {
-              return;
-            }
-
-            try {
-              await peerConnection.setRemoteDescription(
-                new RTCSessionDescription(
-                  answer
-                )
-              );
-            } catch (error) {
-              console.error(
-                "Remote description error:",
-                error
-              );
-            }
+          } catch (err) {
+            // ICE candidates can arrive before the remote description.
+            // Log this for debugging; the connection may still recover.
+            console.warn("Could not add ICE candidate:", err);
           }
-        );
+        });
 
-        // ==================================
-        // ICE CANDIDATE
-        // ==================================
+        socket.on("participant-left", () => {
+          setParticipantConnected(false);
 
-        socket.on(
-          "ice-candidate",
-          async ({ candidate }) => {
-            const peerConnection =
-              peerConnectionRef.current;
-
-            if (!peerConnection) {
-              return;
-            }
-
-            try {
-              await peerConnection.addIceCandidate(
-                new RTCIceCandidate(
-                  candidate
-                )
-              );
-            } catch (error) {
-              console.error(
-                "ICE candidate error:",
-                error
-              );
-            }
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = null;
           }
-        );
 
-        // ==================================
-        // PARTICIPANT LEFT
-        // ==================================
-
-        socket.on(
-          "participant-left",
-          () => {
-            console.log(
-              "Other participant left"
-            );
-
-            setParticipantConnected(false);
-
-            if (
-              remoteVideoRef.current
-            ) {
-              remoteVideoRef.current.srcObject =
-                null;
-            }
-
-            if (
-              peerConnectionRef.current
-            ) {
-              peerConnectionRef.current.close();
-
-              peerConnectionRef.current =
-                null;
-            }
+          if (peerConnectionRef.current) {
+            peerConnectionRef.current.close();
+            peerConnectionRef.current = null;
           }
-        );
+        });
 
-        // ==================================
-        // ROOM STATUS
-        // ==================================
-
-        socket.on(
-          "room-status",
-          ({ participantCount }) => {
-            console.log(
-              "Participants:",
-              participantCount
-            );
-
-            setParticipantConnected(
-              participantCount > 1
-            );
-          }
-        );
-
-        // ==================================
-        // CHAT
-        // ==================================
-
-        socket.on(
-          "consultation-message",
-          (message) => {
-            setMessages((previous) => [
-              ...previous,
-              message,
-            ]);
-          }
-        );
-      } catch (error) {
-        console.error(
-          "Consultation startup error:",
-          error
-        );
+        socket.on("connect_error", (err) => {
+          console.error("Signaling connection error:", err.message);
+          setMediaError(
+            "Could not connect to the consultation server. Check that the backend is running."
+          );
+        });
+      } catch (err) {
+        console.error("Consultation startup error:", err);
+        setMediaError(err.message || "Could not start the consultation.");
       }
     }
 
-    startConsultation();
-
-    // ======================================
-    // CLEANUP
-    // ======================================
+    connectConsultation();
 
     return () => {
       cancelled = true;
 
-      if (socketRef.current) {
-        socketRef.current.emit(
-          "leave-consultation",
-          {
-            appointmentId,
-          }
-        );
+      if (socket) {
+        socket.emit("leave-consultation", { appointmentId });
+        socket.removeAllListeners();
+        socket.disconnect();
+      }
 
-        socketRef.current.disconnect();
-
+      if (socketRef.current === socket) {
         socketRef.current = null;
       }
 
-      if (
-        peerConnectionRef.current
-      ) {
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.ontrack = null;
+        peerConnectionRef.current.onicecandidate = null;
         peerConnectionRef.current.close();
-
         peerConnectionRef.current = null;
       }
 
-      if (
-        localStreamRef.current
-      ) {
-        localStreamRef.current
-          .getTracks()
-          .forEach((track) =>
-            track.stop()
-          );
+      screenStreamRef.current?.getTracks().forEach((track) => track.stop());
+      screenStreamRef.current = null;
 
-        localStreamRef.current = null;
+      localStreamRef.current?.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = null;
       }
     };
-  }, [appointment, appointmentId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointment, appointmentId, token, user.id, user.name, user.role]);
 
-  // ========================================
-  // MICROPHONE
-  // ========================================
+  // --------------------------------------------------
+  // MEDIA CONTROLS
+  // --------------------------------------------------
 
   function toggleMicrophone() {
-    if (!localStreamRef.current) {
+    const tracks = localStreamRef.current?.getAudioTracks() || [];
+    if (!tracks.length) {
+      setMediaError("Microphone is not available.");
       return;
     }
 
-    const audioTracks =
-      localStreamRef.current.getAudioTracks();
-
-    audioTracks.forEach((track) => {
-      track.enabled = !track.enabled;
+    const nextEnabled = !tracks.some((track) => track.enabled);
+    tracks.forEach((track) => {
+      track.enabled = nextEnabled;
     });
 
-    setMicOn(
-      audioTracks.some(
-        (track) => track.enabled
-      )
-    );
+    setMicOn(nextEnabled);
   }
-
-  // ========================================
-  // CAMERA
-  // ========================================
 
   function toggleCamera() {
-    if (!localStreamRef.current) {
+    const tracks = localStreamRef.current?.getVideoTracks() || [];
+    if (!tracks.length) {
+      setMediaError("Camera is not available.");
       return;
     }
 
-    const videoTracks =
-      localStreamRef.current.getVideoTracks();
-
-    videoTracks.forEach((track) => {
-      track.enabled = !track.enabled;
+    const nextEnabled = !tracks.some((track) => track.enabled);
+    tracks.forEach((track) => {
+      track.enabled = nextEnabled;
     });
 
-    setCameraOn(
-      videoTracks.some(
-        (track) => track.enabled
-      )
-    );
+    setCameraOn(nextEnabled);
   }
-
-  // ========================================
-  // SCREEN SHARE
-  // ========================================
 
   async function shareScreen() {
     try {
-      if (
-        !navigator.mediaDevices?.getDisplayMedia
-      ) {
-        alert(
-          "Screen sharing is not supported by this browser."
-        );
-
-        return;
+      if (!navigator.mediaDevices?.getDisplayMedia) {
+        throw new Error("Screen sharing is not supported in this browser.");
       }
 
-      const screenStream =
-        await navigator.mediaDevices.getDisplayMedia(
-          {
-            video: true,
-          }
-        );
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+      });
 
-      const screenTrack =
-        screenStream.getVideoTracks()[0];
+      screenStreamRef.current = screenStream;
 
-      const peerConnection =
-        peerConnectionRef.current;
+      const screenTrack = screenStream.getVideoTracks()[0];
+      const pc = peerConnectionRef.current;
 
-      if (peerConnection) {
-        const sender =
-          peerConnection
-            .getSenders()
-            .find(
-              (item) =>
-                item.track?.kind ===
-                "video"
-            );
+      const videoSender = pc
+        ?.getSenders()
+        .find((sender) => sender.track?.kind === "video");
 
-        if (sender) {
-          await sender.replaceTrack(
-            screenTrack
-          );
-        }
+      if (videoSender && screenTrack) {
+        await videoSender.replaceTrack(screenTrack);
       }
 
       if (localVideoRef.current) {
-        localVideoRef.current.srcObject =
-          screenStream;
+        localVideoRef.current.srcObject = screenStream;
+        localVideoRef.current.play().catch(() => {});
       }
 
-      screenTrack.onended = async () => {
-        const cameraTrack =
-          localStreamRef.current?.getVideoTracks()[0];
+      if (screenTrack) {
+        screenTrack.onended = async () => {
+          const cameraTrack =
+            localStreamRef.current?.getVideoTracks()[0];
 
-        if (cameraTrack) {
-          const peerConnection =
-            peerConnectionRef.current;
-
-          if (peerConnection) {
-            const sender =
-              peerConnection
-                .getSenders()
-                .find(
-                  (item) =>
-                    item.track?.kind ===
-                    "video"
-                );
-
-            if (sender) {
-              await sender.replaceTrack(
-                cameraTrack
-              );
-            }
+          if (videoSender && cameraTrack) {
+            await videoSender.replaceTrack(cameraTrack);
           }
 
-          if (
-            localVideoRef.current
-          ) {
-            localVideoRef.current.srcObject =
-              localStreamRef.current;
+          if (localVideoRef.current && localStreamRef.current) {
+            localVideoRef.current.srcObject = localStreamRef.current;
+            localVideoRef.current.play().catch(() => {});
           }
-        }
-      };
-    } catch (error) {
-      console.log(
-        "Screen sharing cancelled."
-      );
+
+          screenStream.getTracks().forEach((track) => track.stop());
+          screenStreamRef.current = null;
+        };
+      }
+    } catch (err) {
+      if (err.name !== "NotAllowedError") {
+        setMediaError(err.message || "Unable to share your screen.");
+      }
     }
   }
 
-  // ========================================
-  // SEND CHAT MESSAGE
-  // ========================================
+  // --------------------------------------------------
+  // END CONSULTATION
+  // --------------------------------------------------
 
-  function sendMessage() {
-    const message =
-      messageText.trim();
-
-    if (
-      !message ||
-      !socketRef.current
-    ) {
-      return;
-    }
-
-    socketRef.current.emit(
-      "consultation-message",
-      {
-        appointmentId,
-        message,
-        user: {
-          id: user.id,
-          name: user.name,
-          role: user.role,
-        },
-      }
+  async function endConsultation() {
+    const confirmed = window.confirm(
+      "Leave this online consultation?"
     );
 
-    setMessageText("");
+    if (!confirmed) return;
+
+    // Stop local media and close connections immediately.
+    socketRef.current?.emit("leave-consultation", { appointmentId });
+    socketRef.current?.disconnect();
+    socketRef.current = null;
+
+    peerConnectionRef.current?.close();
+    peerConnectionRef.current = null;
+
+    screenStreamRef.current?.getTracks().forEach((track) => track.stop());
+    screenStreamRef.current = null;
+
+    localStreamRef.current?.getTracks().forEach((track) => track.stop());
+    localStreamRef.current = null;
+
+    // Do not mark an appointment Completed merely because one user
+    // leaves. The doctor should complete it through the proper workflow.
+    navigate(
+      isDoctor ? "/doctor-appointments" : "/patient-appointments"
+    );
   }
 
-  // ========================================
-  // END CONSULTATION
-  // ========================================
-
-  function endConsultation() {
-    const confirmed =
-      window.confirm(
-        "Are you sure you want to leave the consultation?"
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    if (socketRef.current) {
-      socketRef.current.emit(
-        "leave-consultation",
-        {
-          appointmentId,
-        }
-      );
-
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-
-    if (
-      peerConnectionRef.current
-    ) {
-      peerConnectionRef.current.close();
-
-      peerConnectionRef.current = null;
-    }
-
-    if (
-      localStreamRef.current
-    ) {
-      localStreamRef.current
-        .getTracks()
-        .forEach((track) =>
-          track.stop()
-        );
-
-      localStreamRef.current = null;
-    }
-
-    if (user.role === "doctor") {
-      navigate(
-        "/doctor-appointments"
-      );
-    } else {
-      navigate(
-        "/patient-appointments"
-      );
-    }
-  }
-
-  // ========================================
-  // LOADING
-  // ========================================
+  // --------------------------------------------------
+  // LOADING / ERROR STATES
+  // --------------------------------------------------
 
   if (loading) {
     return (
       <div className="consultation-loading">
-
-        <div className="loading-spinner"></div>
-
-        <h2>
-          Preparing consultation room...
-        </h2>
-
-        <p>
-          Please wait while we connect you.
-        </p>
-
+        <div className="loading-spinner" />
+        <h2>Preparing consultation room...</h2>
+        <p>Please wait while we load your appointment.</p>
       </div>
     );
   }
-
-  // ========================================
-  // ERROR
-  // ========================================
 
   if (error) {
     return (
       <div className="consultation-error-page">
-
         <div className="consultation-error-card">
-
-          <div className="error-icon">
-            ⚠️
-          </div>
-
-          <h2>
-            Unable to Join Consultation
-          </h2>
-
-          <p>
-            {error}
-          </p>
-
+          <div className="error-icon">⚠️</div>
+          <h2>Unable to Join Consultation</h2>
+          <p>{error}</p>
           <button
             onClick={() =>
-              user.role === "doctor"
-                ? navigate(
-                    "/doctor-appointments"
-                  )
-                : navigate(
-                    "/patient-appointments"
-                  )
+              navigate(
+                isDoctor
+                  ? "/doctor-appointments"
+                  : "/patient-appointments"
+              )
             }
           >
             ← Back to Appointments
           </button>
-
         </div>
-
       </div>
     );
   }
 
-  const isDoctor =
-    user.role === "doctor";
+  if (!appointment) return null;
 
   const otherPersonName = isDoctor
-    ? appointment.patient_name
-    : appointment.doctor_name;
+    ? appointment.patient_name || "Patient"
+    : appointment.doctor_name || "Doctor";
+
+  // --------------------------------------------------
+  // CONSULTATION ROOM
+  // --------------------------------------------------
 
   return (
     <div className="consultation-room">
-
-      {/* ======================================
-          HEADER
-      ====================================== */}
-
       <header className="consultation-header">
-
         <div className="consultation-brand">
-
-          <div className="brand-icon">
-            +
-          </div>
-
+          <div className="brand-icon">+</div>
           <div>
-            <h1>
-              MediCare+
-            </h1>
-
-            <span>
-              Secure Online Consultation
-            </span>
+            <h1>MediCare+</h1>
+            <span>Secure Online Consultation</span>
           </div>
-
         </div>
 
         <div className="consultation-status">
-
-          <span className="status-dot"></span>
-
+          <span
+            className={`status-dot ${
+              participantConnected ? "status-connected" : ""
+            }`}
+          />
           {participantConnected
             ? "Connected"
             : "Waiting for participant"}
-
         </div>
-
       </header>
 
-      {/* ======================================
-          MAIN
-      ====================================== */}
-
       <main className="consultation-main">
-
         <section className="video-section">
-
-          {/* ==================================
-              REMOTE VIDEO
-          ================================== */}
-
           <div className="remote-video-card">
-
             <video
               ref={remoteVideoRef}
               autoPlay
@@ -926,46 +745,22 @@ function OnlineConsultation() {
 
             {!participantConnected && (
               <div className="remote-video-placeholder">
-
                 <div className="participant-avatar">
-                  {otherPersonName
-                    ?.charAt(0)
-                    .toUpperCase() || "?"}
+                  {otherPersonName.charAt(0).toUpperCase()}
                 </div>
-
                 <h2>
-                  {isDoctor
-                    ? appointment.patient_name ||
-                      "Patient"
-                    : `Dr. ${
-                        appointment.doctor_name ||
-                        "Doctor"
-                      }`}
+                  {isDoctor ? otherPersonName : `Dr. ${otherPersonName}`}
                 </h2>
-
-                <p>
-                  Waiting for video connection...
-                </p>
-
+                <p>Waiting for video connection...</p>
               </div>
             )}
 
             <div className="participant-label">
-
-              {isDoctor
-                ? "Patient"
-                : "Doctor"}
-
+              {isDoctor ? "Patient" : "Doctor"}
             </div>
-
           </div>
 
-          {/* ==================================
-              LOCAL VIDEO
-          ================================== */}
-
           <div className="local-video-card">
-
             <video
               ref={localVideoRef}
               autoPlay
@@ -976,306 +771,183 @@ function OnlineConsultation() {
 
             {!cameraOn && (
               <div className="camera-off-overlay">
-
-                <div className="camera-off-icon">
-                  📷
-                </div>
-
-                <span>
-                  Camera Off
-                </span>
-
+                <div className="camera-off-icon">📷</div>
+                <span>Camera Off</span>
               </div>
             )}
 
-            <div className="self-label">
-              You
-            </div>
-
+            <div className="self-label">You</div>
           </div>
 
-          {/* ==================================
-              MEDIA ERROR
-          ================================== */}
-
           {mediaError && (
-            <div className="media-error">
-
-              <span>
-                ⚠️
-              </span>
-
-              {mediaError}
-
+            <div className="media-error" role="alert">
+              ⚠️ {mediaError}
             </div>
           )}
 
-          {/* ==================================
-              CONTROLS
-          ================================== */}
-
           <div className="consultation-controls">
-
             <button
-              className={`control-btn ${
-                !micOn
-                  ? "control-off"
-                  : ""
-              }`}
-              onClick={
-                toggleMicrophone
-              }
-              title={
-                micOn
-                  ? "Mute microphone"
-                  : "Unmute microphone"
-              }
+              className={`control-btn ${!micOn ? "control-off" : ""}`}
+              onClick={toggleMicrophone}
+              title={micOn ? "Mute microphone" : "Unmute microphone"}
+              aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
             >
-              {micOn
-                ? "🎙️"
-                : "🔇"}
+              {micOn ? "🎙️" : "🔇"}
             </button>
 
             <button
-              className={`control-btn ${
-                !cameraOn
-                  ? "control-off"
-                  : ""
-              }`}
-              onClick={
-                toggleCamera
-              }
-              title={
-                cameraOn
-                  ? "Turn camera off"
-                  : "Turn camera on"
-              }
+              className={`control-btn ${!cameraOn ? "control-off" : ""}`}
+              onClick={toggleCamera}
+              title={cameraOn ? "Turn camera off" : "Turn camera on"}
+              aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}
             >
-              {cameraOn
-                ? "📹"
-                : "🚫"}
+              {cameraOn ? "📹" : "🚫"}
             </button>
 
             <button
               className="control-btn"
-              onClick={
-                shareScreen
-              }
+              onClick={shareScreen}
               title="Share screen"
+              aria-label="Share screen"
             >
               🖥️
             </button>
 
             <button
               className={`control-btn ${
-                chatOpen
-                  ? "control-active"
-                  : ""
+                chatOpen ? "control-active" : ""
               }`}
-              onClick={() =>
-                setChatOpen(
-                  !chatOpen
-                )
-              }
+              onClick={() => setChatOpen((open) => !open)}
               title="Open chat"
+              aria-label="Toggle chat"
             >
               💬
             </button>
 
-            <button
-              className="end-call-btn"
-              onClick={
-                endConsultation
-              }
-            >
-              📞 End
+            <button className="end-call-btn" onClick={endConsultation}>
+              📞 Leave
             </button>
-
           </div>
-
         </section>
 
-        {/* ======================================
-            SIDEBAR
-        ====================================== */}
-
         <aside className="consultation-sidebar">
-
           <div className="sidebar-header">
-
-            <h2>
-              Consultation Details
-            </h2>
-
-            <span>
-              #{appointment.id}
-            </span>
-
+            <h2>Consultation Details</h2>
+            <span>#{appointment.id}</span>
           </div>
 
           <div className="consultation-detail">
-
-            <span>
-              📅 Date
-            </span>
-
-            <strong>
-              {appointment.appointment_date}
-            </strong>
-
+            <span>📅 Date</span>
+            <strong>{appointment.appointment_date || "Not available"}</strong>
           </div>
 
           <div className="consultation-detail">
-
-            <span>
-              ⏰ Time
-            </span>
-
-            <strong>
-              {appointment.appointment_time}
-            </strong>
-
+            <span>⏰ Scheduled time</span>
+            <strong>{appointment.appointment_time || "Not available"}</strong>
           </div>
 
           <div className="consultation-detail">
-
-            <span>
-              👤{" "}
-              {isDoctor
-                ? "Patient"
-                : "Doctor"}
-            </span>
-
+            <span>👤 {isDoctor ? "Patient" : "Doctor"}</span>
             <strong>
-              {isDoctor
-                ? appointment.patient_name
-                : `Dr. ${
-                    appointment.doctor_name ||
-                    "Doctor"
-                  }`}
+              {isDoctor ? otherPersonName : `Dr. ${otherPersonName}`}
             </strong>
-
           </div>
 
-          {!isDoctor &&
-            appointment.specialization && (
-              <div className="consultation-detail">
-
-                <span>
-                  🩺 Specialization
-                </span>
-
-                <strong>
-                  {appointment.specialization}
-                </strong>
-
-              </div>
-            )}
+          {appointment.specialization && (
+            <div className="consultation-detail">
+              <span>🩺 Specialization</span>
+              <strong>{appointment.specialization}</strong>
+            </div>
+          )}
 
           {appointment.symptoms && (
             <div className="symptoms-panel">
-
-              <span>
-                Symptoms
-              </span>
-
-              <p>
-                {appointment.symptoms}
-              </p>
-
+              <span>Symptoms</span>
+              <p>{appointment.symptoms}</p>
             </div>
           )}
-
-          {/* ==================================
-              CHAT
-          ================================== */}
 
           {chatOpen && (
             <div className="chat-panel">
-
               <div className="chat-header">
-                Consultation Chat
+                <span>Appointment Chat</span>
+                <button
+                  type="button"
+                  onClick={() => setChatOpen(false)}
+                  aria-label="Close chat"
+                >
+                  ×
+                </button>
               </div>
 
               <div className="chat-messages">
-
                 {messages.length === 0 ? (
                   <div className="chat-empty">
-
                     💬
-
-                    <p>
-                      No messages yet.
-                    </p>
-
+                    <p>No messages yet.</p>
                   </div>
                 ) : (
-                  messages.map(
-                    (item, index) => (
+                  messages.map((item, index) => {
+                    const senderId =
+                      item.user_id ?? item.sender_id ?? item.user?.id;
+
+                    const ownMessage =
+                      String(senderId) === String(user.id);
+
+                    return (
                       <div
+                        key={item.id ?? `${item.created_at}-${index}`}
                         className={`chat-message ${
-                          item.user?.id ===
-                          user.id
-                            ? "my-message"
-                            : "other-message"
+                          ownMessage ? "my-message" : "other-message"
                         }`}
-                        key={index}
                       >
                         <strong>
-                          {item.user?.name ||
-                            "User"}
+                          {item.user_name ||
+                            item.sender_name ||
+                            item.user?.name ||
+                            (ownMessage ? "You" : "Participant")}
                         </strong>
-
-                        <p>
-                          {item.message}
-                        </p>
+                        <p>{item.message || item.content}</p>
+                        {item.created_at && (
+                          <small>
+                            {new Date(item.created_at).toLocaleTimeString(
+                              [],
+                              { hour: "2-digit", minute: "2-digit" }
+                            )}
+                          </small>
+                        )}
                       </div>
-                    )
-                  )
+                    );
+                  })
                 )}
-
               </div>
 
-              <div className="chat-input-row">
+              {chatError && (
+                <p className="chat-error" role="alert">
+                  {chatError}
+                </p>
+              )}
 
+              <form className="chat-input-row" onSubmit={sendMessage}>
                 <input
                   type="text"
-                  value={
-                    messageText
-                  }
-                  onChange={(event) =>
-                    setMessageText(
-                      event.target.value
-                    )
-                  }
-                  onKeyDown={(event) => {
-                    if (
-                      event.key ===
-                      "Enter"
-                    ) {
-                      sendMessage();
-                    }
-                  }}
+                  value={messageText}
+                  onChange={(event) => setMessageText(event.target.value)}
                   placeholder="Type a message..."
+                  maxLength={2000}
+                  aria-label="Chat message"
                 />
-
                 <button
-                  onClick={
-                    sendMessage
-                  }
+                  type="submit"
+                  disabled={!messageText.trim() || sendingMessage}
                 >
-                  ➤
+                  {sendingMessage ? "…" : "➤"}
                 </button>
-
-              </div>
-
+              </form>
             </div>
           )}
-
         </aside>
-
       </main>
-
     </div>
   );
 }

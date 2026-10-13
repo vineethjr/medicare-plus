@@ -206,3 +206,81 @@
     align-items: flex-start;
   }
 }
+
+/* Prescription display */
+.prescription-record-section {
+  min-width: 0;
+}
+
+.prescription-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 12px;
+  border: 1px solid #dbe5ef;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.prescription-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.prescription-table th,
+.prescription-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #e5eaf0;
+  vertical-align: top;
+}
+
+.prescription-table th {
+  background: #eff6ff;
+  color: #17446d;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.prescription-table td {
+  color: #334155;
+  overflow-wrap: anywhere;
+}
+
+.prescription-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.legacy-prescription {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.print-prescription-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 9px;
+  background: #155e75;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.print-prescription-btn:hover {
+  background: #164e63;
+}
+
+@media (max-width: 640px) {
+  .prescription-table {
+    min-width: 650px;
+  }
+
+  .print-prescription-btn {
+    width: 100%;
+  }
+}

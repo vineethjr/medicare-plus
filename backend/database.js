@@ -1,8 +1,12 @@
+
 const Database = require("better-sqlite3");
 
+// Create or connect to the existing SQLite database
 const db = new Database("database.sqlite");
 
+// Enable database settings
 db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
 
 // ========================================
 // USERS TABLE
@@ -53,47 +57,38 @@ db.exec(`
 db.exec(`
   CREATE TABLE IF NOT EXISTS consultation_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-
     appointment_id INTEGER NOT NULL UNIQUE,
-
     patient_id INTEGER NOT NULL,
-
     doctor_id INTEGER NOT NULL,
-
     diagnosis TEXT,
-
     prescription TEXT,
-
     doctor_notes TEXT,
-
     follow_up_date TEXT,
-
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (appointment_id)
-      REFERENCES appointments(id),
-
-    FOREIGN KEY (patient_id)
-      REFERENCES users(id),
-
-    FOREIGN KEY (doctor_id)
-      REFERENCES users(id)
+    FOREIGN KEY (appointment_id) REFERENCES appointments(id),
+    FOREIGN KEY (patient_id) REFERENCES users(id),
+    FOREIGN KEY (doctor_id) REFERENCES users(id)
   )
 `);
 
 // ========================================
-// DATABASE MIGRATION HELPER
+// MIGRATION HELPER
 // ========================================
 
-function addColumnIfMissing(tableName, columnName, columnDefinition) {
-  try {
+function addColumnIfMissing(tableName, columnName, definition) {
+  const columns = db
+    .prepare(`PRAGMA table_info(${tableName})`)
+    .all();
+
+  const columnExists = columns.some(
+    (column) => column.name === columnName
+  );
+
+  if (!columnExists) {
     db.exec(
-      `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`
+      `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`
     );
-  } catch (error) {
-    if (!error.message.includes("duplicate column name")) {
-      throw error;
-    }
   }
 }
 
@@ -125,6 +120,68 @@ addColumnIfMissing(
   "TEXT"
 );
 
-console.log("SQLite database connected successfully");
+addColumnIfMissing(
+  "appointments",
+  "consultation_started_at",
+  "TEXT"
+);
+
+addColumnIfMissing(
+  "appointments",
+  "consultation_ended_at",
+  "TEXT"
+);
+
+// ========================================
+// APPOINTMENT HISTORY VISIBILITY
+// ========================================
+
+// Patients and doctors can independently hide appointments
+// from their own history without deleting the actual records.
+
+addColumnIfMissing(
+  "appointments",
+  "patient_hidden",
+  "INTEGER NOT NULL DEFAULT 0"
+);
+
+addColumnIfMissing(
+  "appointments",
+  "doctor_hidden",
+  "INTEGER NOT NULL DEFAULT 0"
+);
+
+// ========================================
+// PERSISTENT APPOINTMENT CHAT
+// ========================================
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS appointment_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    appointment_id INTEGER NOT NULL,
+    sender_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+    FOREIGN KEY (appointment_id)
+      REFERENCES appointments(id),
+
+    FOREIGN KEY (sender_id)
+      REFERENCES users(id)
+  )
+`);
+
+// ========================================
+// APPOINTMENT CHAT INDEX
+// ========================================
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_appointment_messages
+  ON appointment_messages(appointment_id, id)
+`);
+
+// ========================================
+// EXPORT DATABASE
+// ========================================
 
 module.exports = db;

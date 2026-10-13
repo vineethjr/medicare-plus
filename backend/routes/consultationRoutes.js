@@ -1,15 +1,14 @@
+
 const express = require("express");
 const db = require("../database");
 const protect = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-/*
-========================================
-CREATE CONSULTATION RECORD
-POST /api/consultations
-========================================
-*/
+// ========================================
+// CREATE CONSULTATION RECORD
+// POST /api/consultations
+// ========================================
 router.post("/", protect, (req, res) => {
   try {
     if (req.user.role !== "doctor") {
@@ -32,17 +31,11 @@ router.post("/", protect, (req, res) => {
       });
     }
 
-    // Find the appointment belonging to this doctor
     const appointment = db
       .prepare(
-        `SELECT
-          id,
-          patient_id,
-          doctor_id,
-          status
-        FROM appointments
-        WHERE id = ?
-        AND doctor_id = ?`
+        `SELECT id, patient_id, doctor_id, status
+         FROM appointments
+         WHERE id = ? AND doctor_id = ?`
       )
       .get(appointment_id, req.user.id);
 
@@ -52,17 +45,13 @@ router.post("/", protect, (req, res) => {
       });
     }
 
-    // Consultation should normally be created after completion
-    if (
-      appointment.status !== "Completed"
-    ) {
+    if (appointment.status !== "Completed") {
       return res.status(400).json({
         message:
-          "Consultation record can only be created for a completed appointment.",
+          "Consultation records can only be created for completed appointments.",
       });
     }
 
-    // Check whether a record already exists
     const existingRecord = db
       .prepare(
         `SELECT id
@@ -78,10 +67,18 @@ router.post("/", protect, (req, res) => {
       });
     }
 
+    // The prescription can be a JSON string containing medicines
+    // or legacy plain text from older consultation records.
+    const prescriptionText =
+      typeof prescription === "string"
+        ? prescription
+        : prescription == null
+          ? ""
+          : JSON.stringify(prescription);
+
     const result = db
       .prepare(
-        `INSERT INTO consultation_records
-        (
+        `INSERT INTO consultation_records (
           appointment_id,
           patient_id,
           doctor_id,
@@ -96,161 +93,31 @@ router.post("/", protect, (req, res) => {
         appointment.id,
         appointment.patient_id,
         appointment.doctor_id,
-        diagnosis || "",
-        prescription || "",
-        doctor_notes || "",
-        follow_up_date || ""
+        typeof diagnosis === "string" ? diagnosis.trim() : "",
+        prescriptionText,
+        typeof doctor_notes === "string" ? doctor_notes.trim() : "",
+        typeof follow_up_date === "string" ? follow_up_date : ""
       );
 
-    res.status(201).json({
-      message:
-        "Consultation record created successfully.",
+    return res.status(201).json({
+      message: "Consultation record created successfully.",
       consultationId: result.lastInsertRowid,
     });
   } catch (error) {
-    console.error(
-      "Create consultation error:",
-      error
-    );
+    console.error("Create consultation error:", error);
 
-    res.status(500).json({
-      message:
-        "Failed to create consultation record.",
-    });
-  }
-});
-
-/*
-========================================
-DOCTOR CONSULTATION RECORDS
-GET /api/consultations/doctor
-========================================
-*/
-router.get("/doctor", protect, (req, res) => {
-  try {
-    if (req.user.role !== "doctor") {
-      return res.status(403).json({
-        message:
-          "Only doctors can access these records.",
-      });
-    }
-
-    const records = db
-      .prepare(
-        `SELECT
-          consultation_records.id,
-          consultation_records.appointment_id,
-          consultation_records.diagnosis,
-          consultation_records.prescription,
-          consultation_records.doctor_notes,
-          consultation_records.follow_up_date,
-          consultation_records.created_at,
-
-          users.name AS patient_name,
-          users.email AS patient_email,
-
-          appointments.appointment_date,
-          appointments.appointment_time
-
-        FROM consultation_records
-
-        JOIN users
-          ON consultation_records.patient_id = users.id
-
-        JOIN appointments
-          ON consultation_records.appointment_id =
-             appointments.id
-
-        WHERE consultation_records.doctor_id = ?
-
-        ORDER BY consultation_records.created_at DESC`
-      )
-      .all(req.user.id);
-
-    res.json(records);
-  } catch (error) {
-    console.error(
-      "Doctor consultation records error:",
-      error
-    );
-
-    res.status(500).json({
-      message:
-        "Failed to load consultation records.",
-    });
-  }
-});
-
-/*
-========================================
-PATIENT CONSULTATION RECORDS
-GET /api/consultations/patient
-========================================
-*/
-router.get("/patient", protect, (req, res) => {
-  try {
-    if (req.user.role !== "patient") {
-      return res.status(403).json({
-        message:
-          "Only patients can access these records.",
-      });
-    }
-
-    const records = db
-      .prepare(
-        `SELECT
-          consultation_records.id,
-          consultation_records.appointment_id,
-          consultation_records.diagnosis,
-          consultation_records.prescription,
-          consultation_records.doctor_notes,
-          consultation_records.follow_up_date,
-          consultation_records.created_at,
-
-          users.name AS doctor_name,
-          users.specialization,
-          users.hospital,
-
-          appointments.appointment_date,
-          appointments.appointment_time
-
-        FROM consultation_records
-
-        JOIN users
-          ON consultation_records.doctor_id = users.id
-
-        JOIN appointments
-          ON consultation_records.appointment_id =
-             appointments.id
-
-        WHERE consultation_records.patient_id = ?
-
-        ORDER BY consultation_records.created_at DESC`
-      )
-      .all(req.user.id);
-
-    res.json(records);
-  } catch (error) {
-    console.error(
-      "Patient consultation records error:",
-      error
-    );
-
-    res.status(500).json({
-      message:
-        "Failed to load consultation records.",
+    return res.status(500).json({
+      message: "Failed to create consultation record.",
     });
   }
 });
 
 // ========================================
-// GET DOCTOR CONSULTATION RECORDS
+// DOCTOR CONSULTATION RECORDS
 // GET /api/consultations/doctor
 // ========================================
-
 router.get("/doctor", protect, (req, res) => {
   try {
-    // Only doctors can access these records
     if (req.user.role !== "doctor") {
       return res.status(403).json({
         message: "Only doctors can access these records.",
@@ -260,53 +127,39 @@ router.get("/doctor", protect, (req, res) => {
     const records = db
       .prepare(
         `SELECT
-          consultation_records.id,
-          consultation_records.appointment_id,
-          consultation_records.diagnosis,
-          consultation_records.prescription,
-          consultation_records.doctor_notes,
-          consultation_records.follow_up_date,
-          consultation_records.created_at,
-
+          cr.id,
+          cr.appointment_id,
+          cr.diagnosis,
+          cr.prescription,
+          cr.doctor_notes,
+          cr.follow_up_date,
+          cr.created_at,
           users.name AS patient_name,
           users.email AS patient_email,
-
           appointments.appointment_date,
           appointments.appointment_time
-
-        FROM consultation_records
-
-        JOIN users
-          ON consultation_records.patient_id = users.id
-
-        JOIN appointments
-          ON consultation_records.appointment_id =
-             appointments.id
-
-        WHERE consultation_records.doctor_id = ?
-
-        ORDER BY consultation_records.created_at DESC`
+        FROM consultation_records AS cr
+        JOIN users ON cr.patient_id = users.id
+        JOIN appointments ON cr.appointment_id = appointments.id
+        WHERE cr.doctor_id = ?
+        ORDER BY cr.created_at DESC`
       )
       .all(req.user.id);
 
-    res.json(records);
+    return res.json(records);
   } catch (error) {
-    console.error(
-      "Doctor consultation records error:",
-      error
-    );
+    console.error("Doctor consultation records error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to load consultation records.",
     });
   }
 });
 
 // ========================================
-// GET PATIENT CONSULTATION RECORDS
+// PATIENT CONSULTATION RECORDS
 // GET /api/consultations/patient
 // ========================================
-
 router.get("/patient", protect, (req, res) => {
   try {
     if (req.user.role !== "patient") {
@@ -318,44 +171,31 @@ router.get("/patient", protect, (req, res) => {
     const records = db
       .prepare(
         `SELECT
-          consultation_records.id,
-          consultation_records.appointment_id,
-          consultation_records.diagnosis,
-          consultation_records.prescription,
-          consultation_records.doctor_notes,
-          consultation_records.follow_up_date,
-          consultation_records.created_at,
-
+          cr.id,
+          cr.appointment_id,
+          cr.diagnosis,
+          cr.prescription,
+          cr.doctor_notes,
+          cr.follow_up_date,
+          cr.created_at,
           users.name AS doctor_name,
           users.specialization,
           users.hospital,
-
           appointments.appointment_date,
           appointments.appointment_time
-
-        FROM consultation_records
-
-        JOIN users
-          ON consultation_records.doctor_id = users.id
-
-        JOIN appointments
-          ON consultation_records.appointment_id =
-             appointments.id
-
-        WHERE consultation_records.patient_id = ?
-
-        ORDER BY consultation_records.created_at DESC`
+        FROM consultation_records AS cr
+        JOIN users ON cr.doctor_id = users.id
+        JOIN appointments ON cr.appointment_id = appointments.id
+        WHERE cr.patient_id = ?
+        ORDER BY cr.created_at DESC`
       )
       .all(req.user.id);
 
-    res.json(records);
+    return res.json(records);
   } catch (error) {
-    console.error(
-      "Patient consultation records error:",
-      error
-    );
+    console.error("Patient consultation records error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to load medical records.",
     });
   }
