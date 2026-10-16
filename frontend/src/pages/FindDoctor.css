@@ -636,3 +636,576 @@
   opacity: 0.65;
   cursor: not-allowed;
 }
+
+/* =========================================================
+   DOCTOR CARD DUAL ACTIONS & VERIFY BUTTON
+   ========================================================= */
+
+.doctor-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.verify-credentials-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.verify-credentials-btn:hover {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: #10b981;
+  transform: translateY(-1px);
+}
+
+.doc-count-tag {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.2);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+/* =========================================================
+   DOCTOR VERIFICATION & CREDENTIALS MODAL
+   ========================================================= */
+
+.verify-doctor-modal {
+  width: 100%;
+  max-width: 680px;
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.verify-modal-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 24px 28px;
+  background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+  border-bottom: 1px solid #99f6e4;
+}
+
+.verify-doc-header {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+
+.verify-avatar {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--primary-600), var(--primary-800));
+  color: white;
+  font-size: 28px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.3);
+  flex-shrink: 0;
+}
+
+.verify-active-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 2px solid white;
+}
+
+.verify-title-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.verify-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.verify-name-row h2 {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--slate-900);
+  margin: 0;
+}
+
+.verified-shield-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.verify-spec {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary-700);
+}
+
+.verify-license-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.license-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--slate-700);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--slate-300);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.license-badge.hospital {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--primary-800);
+  border-color: #99f6e4;
+  background: white;
+}
+
+.verify-modal-body {
+  padding: 24px 28px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.verify-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.verify-stat-card {
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+
+.verify-stat-card span {
+  display: block;
+  font-size: 11px;
+  color: var(--slate-500);
+  font-weight: 600;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.verify-stat-card strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--slate-800);
+}
+
+.verify-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.verify-section h3 {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--slate-900);
+  margin: 0;
+}
+
+.verify-bio-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--slate-600);
+  margin: 0;
+  background: var(--slate-50);
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--slate-200);
+}
+
+.verify-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.doc-count-pill {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  background: #ccfbf1;
+  color: #0f766e;
+  border-radius: 999px;
+}
+
+.empty-cert-notice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 12px;
+  color: #0f766e;
+}
+
+.empty-cert-notice strong {
+  display: block;
+  font-size: 13px;
+  color: #115e59;
+}
+
+.empty-cert-notice p {
+  font-size: 12px;
+  color: #0f766e;
+  margin: 2px 0 0;
+}
+
+.verify-docs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.verify-doc-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: white;
+  border: 1px solid var(--slate-200);
+  border-radius: 12px;
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition-fast);
+}
+
+.verify-doc-item:hover {
+  border-color: var(--primary-400);
+  box-shadow: var(--shadow-sm);
+}
+
+.doc-item-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  color: #059669;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.doc-item-info {
+  flex: 1;
+}
+
+.doc-item-info h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin: 0 0 3px;
+}
+
+.doc-item-type {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary-700);
+  background: #f0fdfa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 8px;
+}
+
+.doc-item-info small {
+  font-size: 11px;
+  color: var(--slate-500);
+}
+
+.btn-inspect-cert {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--primary-600);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-inspect-cert:hover {
+  background: var(--primary-700);
+}
+
+.verify-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 28px;
+  background: var(--slate-50);
+  border-top: 1px solid var(--slate-200);
+  gap: 12px;
+}
+
+.btn-cancel-verify {
+  padding: 10px 18px;
+  background: white;
+  border: 1px solid var(--slate-300);
+  color: var(--slate-700);
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-book-from-verify {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.25);
+  transition: all var(--transition-fast);
+}
+
+.btn-book-from-verify:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.35);
+}
+
+/* =========================================================
+   INSPECT DOCUMENT VIEWER CARD
+   ========================================================= */
+
+.viewer-overlay {
+  z-index: 1200;
+}
+
+.patient-doc-viewer-card {
+  width: 100%;
+  max-width: 760px;
+  background: #0f172a;
+  color: white;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(45, 212, 191, 0.3);
+}
+
+.viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px;
+  background: #071520;
+  border-bottom: 1px solid rgba(45, 212, 191, 0.2);
+}
+
+.viewer-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.viewer-title h3 {
+  font-size: 16px;
+  font-weight: 800;
+  color: white;
+  margin: 0;
+}
+
+.viewer-title small {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.viewer-body {
+  position: relative;
+  padding: 20px;
+  background: #020617;
+  max-height: 65vh;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.patient-watermark-seal {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  background: rgba(6, 78, 59, 0.85);
+  color: #34d399;
+  border: 1px solid #10b981;
+  padding: 4px 10px;
+  border-radius: 999px;
+  z-index: 10;
+}
+
+.patient-cert-img {
+  max-width: 100%;
+  max-height: 520px;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+}
+
+.patient-cert-canvas {
+  width: 100%;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.canvas-border {
+  border: 3px double #10b981;
+  border-radius: 12px;
+  padding: 30px 24px;
+  text-align: center;
+  background: #0b1a20;
+}
+
+.canvas-border h2 {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #34d399;
+  margin: 12px 0 6px;
+}
+
+.canvas-border h3 {
+  font-size: 22px;
+  font-weight: 800;
+  color: white;
+  margin: 0 0 12px;
+}
+
+.cert-doc-sub {
+  font-size: 14px;
+  color: #cbd5e1;
+  margin: 0 0 16px;
+}
+
+.cert-desc {
+  font-size: 13px;
+  color: #94a3b8;
+  max-width: 520px;
+  margin: 0 auto 20px;
+  line-height: 1.6;
+}
+
+.cert-stamped-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(45, 212, 191, 0.2);
+  padding-top: 16px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.official-stamp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #10b981;
+  font-weight: 800;
+  border: 1.5px solid #10b981;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.viewer-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px;
+  background: #071520;
+  border-top: 1px solid rgba(45, 212, 191, 0.2);
+}
+
+.doc-uid {
+  font-size: 11px;
+  color: #64748b;
+  font-family: monospace;
+}
+
+@media (max-width: 640px) {
+  .verify-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .verify-doc-header {
+    flex-direction: column;
+    text-align: center;
+  }
+}

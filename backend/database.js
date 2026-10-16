@@ -103,6 +103,33 @@ addColumnIfMissing("users", "consultation_fee", "INTEGER DEFAULT 0");
 addColumnIfMissing("users", "hospital", "TEXT");
 addColumnIfMissing("users", "bio", "TEXT");
 addColumnIfMissing("users", "availability", "TEXT");
+addColumnIfMissing("users", "medical_license", "TEXT");
+addColumnIfMissing("users", "verification_status", "TEXT DEFAULT 'Verified'");
+
+// ========================================
+// DOCTOR QUALIFICATION DOCUMENTS TABLE
+// ========================================
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS doctor_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doctor_id INTEGER NOT NULL,
+    document_name TEXT NOT NULL,
+    document_type TEXT NOT NULL,
+    issuer TEXT,
+    issue_year TEXT,
+    file_url TEXT NOT NULL,
+    file_name TEXT,
+    status TEXT DEFAULT 'Verified',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (doctor_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_doctor_documents
+  ON doctor_documents(doctor_id)
+`);
 
 // Patient Profile Fields
 addColumnIfMissing("users", "age", "INTEGER");

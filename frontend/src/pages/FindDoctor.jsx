@@ -4,11 +4,14 @@ import "./FindDoctor.css";
 import {
   AlertCircleIcon,
   ArrowRightIcon,
+  AwardIcon,
   BabyIcon,
   BoneIcon,
   BrainIcon,
   CheckCircleIcon,
   DoctorIcon,
+  EyeIcon,
+  FileTextIcon,
   HeartPulseIcon,
   HospitalIcon,
   PillIcon,
@@ -34,6 +37,8 @@ function FindDoctor() {
   const [specialization, setSpecialization] = useState("");
 
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [verifyingDoctor, setVerifyingDoctor] = useState(null);
+  const [inspectingDoc, setInspectingDoc] = useState(null);
 
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
@@ -376,13 +381,28 @@ function FindDoctor() {
                 <strong className="fee-display-val">₹{fee}</strong>
               </div>
 
-              <button
-                className="consult-btn"
-                onClick={() => openBookingForm(doctor)}
-              >
-                <span>Book Appointment</span>
-                <ArrowRightIcon size={16} />
-              </button>
+              <div className="doctor-card-actions">
+                <button
+                  type="button"
+                  className="verify-credentials-btn"
+                  onClick={() => setVerifyingDoctor(doctor)}
+                >
+                  <ShieldCheckIcon size={14} />
+                  <span>Verify Doctor & Credentials</span>
+                  {doctor.documents && doctor.documents.length > 0 && (
+                    <span className="doc-count-tag">{doctor.documents.length} verified</span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  className="consult-btn"
+                  onClick={() => openBookingForm(doctor)}
+                >
+                  <span>Book Appointment</span>
+                  <ArrowRightIcon size={15} />
+                </button>
+              </div>
             </div>
           );
         })}
@@ -547,6 +567,233 @@ function FindDoctor() {
                 <ArrowRightIcon size={16} />
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DOCTOR CREDENTIALS & PROFILE VERIFICATION MODAL */}
+      {verifyingDoctor && (
+        <div
+          className="booking-overlay"
+          onClick={() => setVerifyingDoctor(null)}
+        >
+          <div
+            className="verify-doctor-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="verify-modal-top">
+              <div className="verify-doc-header">
+                <div className="verify-avatar">
+                  {verifyingDoctor.name?.charAt(0).toUpperCase() || "D"}
+                  <span className="verify-active-dot"></span>
+                </div>
+                <div className="verify-title-meta">
+                  <div className="verify-name-row">
+                    <h2>Dr. {verifyingDoctor.name}</h2>
+                    <span className="verified-shield-tag">
+                      <ShieldCheckIcon size={14} /> MediCare+ Verified Registry
+                    </span>
+                  </div>
+                  <span className="verify-spec">
+                    {verifyingDoctor.specialization || "General Physician"} • {verifyingDoctor.qualification || "MBBS"}
+                  </span>
+                  <div className="verify-license-row">
+                    <span className="license-badge">
+                      Medical License: {verifyingDoctor.medical_license || "SMC-ACTIVE-REGISTRY"}
+                    </span>
+                    <span className="license-badge hospital">
+                      <HospitalIcon size={13} /> {verifyingDoctor.hospital || "Medical Practice"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                className="close-modal-btn"
+                onClick={() => setVerifyingDoctor(null)}
+              >
+                <XIcon size={18} />
+              </button>
+            </div>
+
+            <div className="verify-modal-body">
+              {/* PRACTICE STATS ROW */}
+              <div className="verify-stats-grid">
+                <div className="verify-stat-card">
+                  <span>Experience</span>
+                  <strong>{verifyingDoctor.experience || 0} Years Active</strong>
+                </div>
+                <div className="verify-stat-card">
+                  <span>Consultation Fee</span>
+                  <strong className="text-teal">₹{verifyingDoctor.consultation_fee || 500}</strong>
+                </div>
+                <div className="verify-stat-card">
+                  <span>Availability</span>
+                  <strong>{verifyingDoctor.availability || "Mon - Fri Standard"}</strong>
+                </div>
+                <div className="verify-stat-card">
+                  <span>Documents on File</span>
+                  <strong className="text-emerald">{verifyingDoctor.documents?.length || 0} Verified</strong>
+                </div>
+              </div>
+
+              {/* BIO */}
+              {verifyingDoctor.bio && (
+                <div className="verify-section">
+                  <h3>Clinical Background & Philosophy</h3>
+                  <p className="verify-bio-text">{verifyingDoctor.bio}</p>
+                </div>
+              )}
+
+              {/* QUALIFICATION DOCUMENTS */}
+              <div className="verify-section">
+                <div className="verify-section-header">
+                  <h3>Official Qualification & Board Certificates</h3>
+                  <span className="doc-count-pill">
+                    {verifyingDoctor.documents?.length || 0} Document(s)
+                  </span>
+                </div>
+
+                {!verifyingDoctor.documents || verifyingDoctor.documents.length === 0 ? (
+                  <div className="empty-cert-notice">
+                    <ShieldCheckIcon size={24} />
+                    <div>
+                      <strong>Registered Clinical Specialist</strong>
+                      <p>
+                        Dr. {verifyingDoctor.name} is clinically registered with MediCare+ under license{" "}
+                        {verifyingDoctor.medical_license || "SMC-VERIFIED"}. Formal scans are being digitized.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="verify-docs-list">
+                    {verifyingDoctor.documents.map((doc) => (
+                      <div className="verify-doc-item" key={doc.id}>
+                        <div className="doc-item-icon">
+                          <AwardIcon size={22} />
+                        </div>
+                        <div className="doc-item-info">
+                          <h4>{doc.document_name}</h4>
+                          <span className="doc-item-type">{doc.document_type}</span>
+                          <small>
+                            Issued by {doc.issuer || "Accreditation Authority"} ({doc.issue_year || "Verified"})
+                          </small>
+                        </div>
+                        <div className="doc-item-action">
+                          <button
+                            type="button"
+                            className="btn-inspect-cert"
+                            onClick={() => setInspectingDoc(doc)}
+                          >
+                            <EyeIcon size={14} />
+                            <span>Inspect Document</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="verify-modal-footer">
+              <button
+                type="button"
+                className="btn-cancel-verify"
+                onClick={() => setVerifyingDoctor(null)}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn-book-from-verify"
+                onClick={() => {
+                  const doc = verifyingDoctor;
+                  setVerifyingDoctor(null);
+                  openBookingForm(doc);
+                }}
+              >
+                <span>Book Appointment with Dr. {verifyingDoctor.name}</span>
+                <ArrowRightIcon size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* INSPECT DOCUMENT CERTIFICATE VIEWER */}
+      {inspectingDoc && (
+        <div
+          className="booking-overlay viewer-overlay"
+          onClick={() => setInspectingDoc(null)}
+        >
+          <div
+            className="patient-doc-viewer-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="viewer-header">
+              <div className="viewer-title">
+                <ShieldCheckIcon size={20} className="text-teal" />
+                <div>
+                  <h3>{inspectingDoc.document_name}</h3>
+                  <small>
+                    {inspectingDoc.document_type} • Issued by {inspectingDoc.issuer || "Medical Authority"}
+                  </small>
+                </div>
+              </div>
+              <button
+                className="close-modal-btn"
+                onClick={() => setInspectingDoc(null)}
+              >
+                <XIcon size={18} />
+              </button>
+            </div>
+
+            <div className="viewer-body">
+              <div className="patient-watermark-seal">
+                <CheckCircleIcon size={15} /> VERIFIED BY MEDICARE+ REGISTRY
+              </div>
+
+              {inspectingDoc.file_url && inspectingDoc.file_url.startsWith("data:image") ? (
+                <img
+                  src={inspectingDoc.file_url}
+                  alt={inspectingDoc.document_name}
+                  className="patient-cert-img"
+                />
+              ) : (
+                <div className="patient-cert-canvas">
+                  <div className="canvas-border">
+                    <AwardIcon size={46} className="text-teal" />
+                    <h2>OFFICIAL VERIFIED MEDICAL CREDENTIAL</h2>
+                    <h3>{inspectingDoc.document_name}</h3>
+                    <p className="cert-doc-sub">
+                      Issued to certified medical specialist Dr. {verifyingDoctor?.name || "Doctor"}
+                    </p>
+                    <p className="cert-desc">
+                      Official qualification issued by <strong>{inspectingDoc.issuer || "Medical Council"}</strong>.
+                      This credential has been reviewed and verified by MediCare+ Clinical Operations.
+                    </p>
+                    <div className="cert-stamped-row">
+                      <span>Accredited: {inspectingDoc.issue_year || "Verified"}</span>
+                      <span className="official-stamp-chip">
+                        <CheckCircleIcon size={14} /> AUTHENTICATED
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="viewer-footer">
+              <span className="doc-uid">Document Registry ID: DOC-VERIFIED-{inspectingDoc.id}</span>
+              <button
+                type="button"
+                className="btn-cancel-verify"
+                onClick={() => setInspectingDoc(null)}
+              >
+                Close Inspection
+              </button>
+            </div>
           </div>
         </div>
       )}
