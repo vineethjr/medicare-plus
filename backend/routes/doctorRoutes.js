@@ -261,6 +261,78 @@ router.delete("/documents/:id", protect, (req, res) => {
 });
 
 /*
+  Get all doctors with verified documents for Find Doctor page
+*/
+router.get("/", protect, (req, res) => {
+  try {
+    const doctors = db
+      .prepare(
+        `
+        SELECT
+          id,
+          name,
+          email,
+          specialization,
+          qualification,
+          experience,
+          consultation_fee,
+          hospital,
+          bio,
+          availability,
+          medical_license,
+          verification_status
+        FROM users
+        WHERE role = 'doctor'
+        ORDER BY id DESC
+        `
+      )
+      .all();
+
+    const allDocuments = db
+      .prepare(
+        `
+        SELECT
+          id,
+          doctor_id,
+          document_name,
+          document_type,
+          issuer,
+          issue_year,
+          file_url,
+          file_name,
+          status,
+          created_at
+        FROM doctor_documents
+        ORDER BY created_at DESC
+        `
+      )
+      .all();
+
+    // Group documents by doctor_id
+    const docsByDoctor = {};
+    for (const doc of allDocuments) {
+      if (!docsByDoctor[doc.doctor_id]) {
+        docsByDoctor[doc.doctor_id] = [];
+      }
+      docsByDoctor[doc.doctor_id].push(doc);
+    }
+
+    const doctorsWithDocs = doctors.map((doc) => ({
+      ...doc,
+      documents: docsByDoctor[doc.id] || [],
+    }));
+
+    res.json(doctorsWithDocs);
+  } catch (error) {
+    console.error("Get doctors error:", error.message);
+
+    res.status(500).json({
+      message: "Failed to load doctors",
+    });
+  }
+});
+
+/*
   Get single doctor with verified documents (public for verification)
 */
 router.get("/:id", protect, (req, res) => {
@@ -322,78 +394,6 @@ router.get("/:id", protect, (req, res) => {
 
     res.status(500).json({
       message: "Failed to load doctor profile",
-    });
-  }
-});
-
-/*
-  Get all doctors with verified documents for Find Doctor page
-*/
-router.get("/", protect, (req, res) => {
-  try {
-    const doctors = db
-      .prepare(
-        `
-        SELECT
-          id,
-          name,
-          email,
-          specialization,
-          qualification,
-          experience,
-          consultation_fee,
-          hospital,
-          bio,
-          availability,
-          medical_license,
-          verification_status
-        FROM users
-        WHERE role = 'doctor'
-        ORDER BY name ASC
-        `
-      )
-      .all();
-
-    const allDocuments = db
-      .prepare(
-        `
-        SELECT
-          id,
-          doctor_id,
-          document_name,
-          document_type,
-          issuer,
-          issue_year,
-          file_url,
-          file_name,
-          status,
-          created_at
-        FROM doctor_documents
-        ORDER BY created_at DESC
-        `
-      )
-      .all();
-
-    // Group documents by doctor_id
-    const docsByDoctor = {};
-    for (const doc of allDocuments) {
-      if (!docsByDoctor[doc.doctor_id]) {
-        docsByDoctor[doc.doctor_id] = [];
-      }
-      docsByDoctor[doc.doctor_id].push(doc);
-    }
-
-    const doctorsWithDocs = doctors.map((doc) => ({
-      ...doc,
-      documents: docsByDoctor[doc.id] || [],
-    }));
-
-    res.json(doctorsWithDocs);
-  } catch (error) {
-    console.error("Get doctors error:", error.message);
-
-    res.status(500).json({
-      message: "Failed to load doctors",
     });
   }
 });

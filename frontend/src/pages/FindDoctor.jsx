@@ -131,18 +131,44 @@ function FindDoctor() {
   const specializations = [
     ...new Set(
       doctors
-        .map((doctor) => doctor.specialization)
+        .map((doctor) => doctor.specialization?.trim())
         .filter(Boolean)
     ),
   ];
+
+  // Default specialty categories
+  const DEFAULT_CATEGORIES = [
+    { name: "Cardiology", icon: HeartPulseIcon },
+    { name: "Neurology", icon: BrainIcon },
+    { name: "General Physician", icon: DoctorIcon },
+    { name: "Pediatrics", icon: BabyIcon },
+    { name: "Dermatology", icon: PillIcon },
+    { name: "Orthopedics", icon: BoneIcon },
+    { name: "Dentistry", icon: ToothIcon },
+  ];
+
+  // Dynamically include registered doctor specializations if not in default categories
+  const extraCategories = specializations
+    .filter((spec) => {
+      const s = spec.toLowerCase();
+      return !DEFAULT_CATEGORIES.some(
+        (c) => c.name.toLowerCase() === s || s.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(s)
+      );
+    })
+    .map((spec) => ({
+      name: spec,
+      icon: DoctorIcon,
+    }));
+
+  const allSpecialtyPills = [...DEFAULT_CATEGORIES, ...extraCategories];
 
   // Filter doctors
   const filteredDoctors = doctors.filter((doctor) => {
     const searchText = search.toLowerCase().trim();
 
-    const doctorName = doctor.name?.toLowerCase() || "";
-    const doctorSpecialization = doctor.specialization?.toLowerCase() || "";
-    const doctorHospital = doctor.hospital?.toLowerCase() || "";
+    const doctorName = doctor.name?.toLowerCase().trim() || "";
+    const doctorSpecialization = doctor.specialization?.toLowerCase().trim() || "";
+    const doctorHospital = doctor.hospital?.toLowerCase().trim() || "";
 
     const matchesSearch =
       !searchText ||
@@ -150,13 +176,26 @@ function FindDoctor() {
       doctorSpecialization.includes(searchText) ||
       doctorHospital.includes(searchText);
 
+    const cleanFilter = specialization.toLowerCase().trim();
     const matchesManualSpecialization =
-      !specialization ||
-      doctorSpecialization === specialization.toLowerCase();
+      !cleanFilter ||
+      doctorSpecialization === cleanFilter ||
+      doctorSpecialization.includes(cleanFilter) ||
+      cleanFilter.includes(doctorSpecialization) ||
+      (cleanFilter.includes("physician") && (doctorSpecialization.includes("physician") || doctorSpecialization.includes("general") || doctorSpecialization.includes("medicine"))) ||
+      (cleanFilter.includes("cardio") && doctorSpecialization.includes("cardio")) ||
+      (cleanFilter.includes("neuro") && doctorSpecialization.includes("neuro")) ||
+      (cleanFilter.includes("pediatr") && doctorSpecialization.includes("pediatr"));
 
+    const cleanAIFilter = specializationFromAI.toLowerCase().trim();
     const matchesAISpecialization =
-      !specializationFromAI ||
-      doctorSpecialization === specializationFromAI.toLowerCase();
+      !cleanAIFilter ||
+      doctorSpecialization === cleanAIFilter ||
+      doctorSpecialization.includes(cleanAIFilter) ||
+      cleanAIFilter.includes(doctorSpecialization) ||
+      (cleanAIFilter.includes("cardio") && doctorSpecialization.includes("cardio")) ||
+      (cleanAIFilter.includes("neuro") && doctorSpecialization.includes("neuro")) ||
+      (cleanAIFilter.includes("pediatr") && doctorSpecialization.includes("pediatr"));
 
     return (
       matchesSearch &&
@@ -347,35 +386,52 @@ function FindDoctor() {
             if (specializationFromAI) navigate("/find-doctor");
           }}
         >
-          <SparklesIcon size={14} /> All Doctors
+          <SparklesIcon size={14} /> All Doctors ({doctors.length})
         </button>
-        {[
-          { name: "Cardiology", icon: HeartPulseIcon },
-          { name: "Neurology", icon: BrainIcon },
-          { name: "General Physician", icon: DoctorIcon },
-          { name: "Pediatrics", icon: BabyIcon },
-          { name: "Dermatology", icon: PillIcon },
-          { name: "Orthopedics", icon: BoneIcon },
-          { name: "Dentistry", icon: ToothIcon },
-        ].map((item) => {
+        {allSpecialtyPills.map((item) => {
           const ItemIcon = item.icon;
+          const isActive =
+            specialization.toLowerCase() === item.name.toLowerCase() ||
+            specializationFromAI.toLowerCase() === item.name.toLowerCase();
+
           return (
             <button
               key={item.name}
               type="button"
-              className={`specialty-pill-btn ${
-                specialization.toLowerCase() === item.name.toLowerCase() ||
-                specializationFromAI.toLowerCase() === item.name.toLowerCase()
-                  ? "active"
-                  : ""
-              }`}
-              onClick={() => setSpecialization(item.name)}
+              className={`specialty-pill-btn ${isActive ? "active" : ""}`}
+              onClick={() => {
+                if (specialization.toLowerCase() === item.name.toLowerCase()) {
+                  setSpecialization("");
+                } else {
+                  setSpecialization(item.name);
+                }
+              }}
             >
               <ItemIcon size={15} />
               <span>{item.name}</span>
             </button>
           );
         })}
+      </div>
+
+      {/* DIRECTORY META / STATS ROW */}
+      <div className="directory-meta-row">
+        <span>
+          Showing <strong>{filteredDoctors.length}</strong> of <strong>{doctors.length}</strong> certified specialists
+        </span>
+        {(specialization || search || specializationFromAI) && (
+          <button
+            type="button"
+            className="clear-filter-pill"
+            onClick={() => {
+              setSpecialization("");
+              setSearch("");
+              if (specializationFromAI) navigate("/find-doctor");
+            }}
+          >
+            Clear Active Filters ✕
+          </button>
+        )}
       </div>
 
       {/* LOADING */}
