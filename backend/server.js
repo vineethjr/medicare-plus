@@ -12,13 +12,9 @@ const app = express();
 // MIDDLEWARE
 // ========================================
 
-const clientOrigin = process.env.CLIENT_URL ? process.env.CLIENT_URL.replace(/\/$/, "") : null;
-const allowedOrigins = clientOrigin
-  ? [clientOrigin, "http://localhost:5173", "http://localhost:3000"]
-  : "*";
-
+// Dynamically reflect request origin so credentials work across Vercel, localhost, and custom domains
 app.use(cors({
-  origin: allowedOrigins,
+  origin: true,
   credentials: true,
 }));
 app.use(express.json());
@@ -81,7 +77,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: (origin, callback) => callback(null, true),
     methods: ["GET", "POST"],
     credentials: true,
   },
