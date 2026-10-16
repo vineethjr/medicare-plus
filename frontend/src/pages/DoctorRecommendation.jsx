@@ -9,6 +9,7 @@ import {
   SparklesIcon,
   StethoscopeIcon,
 } from "../components/Icons";
+import { API_URL } from "../config";
 
 const QUICK_SYMPTOMS = [
   "High fever, persistent dry cough and sore throat",
@@ -41,7 +42,7 @@ function DoctorRecommendation() {
     setRecommendation(null);
 
     try {
-      const response = await fetch("http://localhost:5000/api/recommendations", {
+      const response = await fetch(`${API_URL}/recommendations`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

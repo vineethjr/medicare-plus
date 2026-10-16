@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./DoctorMedicalRecords.css";
+import { API_URL } from "../config";
 
 function DoctorMedicalRecords() {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ function DoctorMedicalRecords() {
         setError("");
 
         const response = await fetch(
-          "http://localhost:5000/api/consultations/doctor",
+          `${API_URL}/consultations/doctor`,
           {
             method: "GET",
             headers: {

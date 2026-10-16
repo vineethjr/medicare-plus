@@ -9,6 +9,7 @@ import {
   PillIcon,
   PrinterIcon,
 } from "../components/Icons";
+import { API_URL } from "../config";
 
 function parsePrescription(value) {
   if (!value || typeof value !== "string") {
@@ -224,7 +225,7 @@ function PatientMedicalRecords() {
         setError("");
 
         const response = await fetch(
-          "http://localhost:5000/api/consultations/patient",
+          `${API_URL}/consultations/patient`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

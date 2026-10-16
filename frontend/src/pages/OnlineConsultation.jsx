@@ -27,9 +27,7 @@ import {
   VideoIcon,
   XIcon,
 } from "../components/Icons";
-
-const API_URL = "http://localhost:5000/api";
-const SOCKET_URL = "http://localhost:5000";
+import { API_URL, SOCKET_URL } from "../config";
 
 const rtcConfiguration = {
   iceServers: [

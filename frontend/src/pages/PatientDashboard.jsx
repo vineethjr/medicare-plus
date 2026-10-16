@@ -20,6 +20,7 @@ import {
   UserIcon,
   ArrowRightIcon,
 } from "../components/Icons";
+import { API_URL } from "../config";
 
 function PatientDashboard() {
   const navigate = useNavigate();
@@ -45,7 +46,7 @@ function PatientDashboard() {
     async function fetchStats() {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/appointments/patient/stats",
+          `${API_URL}/appointments/patient/stats`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./DoctorProfile.css";
+import { API_URL } from "../config";
 
 function DoctorProfile() {
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ function DoctorProfile() {
     async function loadProfile() {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/doctors/profile",
+          `${API_URL}/doctors/profile`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -75,7 +76,7 @@ function DoctorProfile() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/doctors/profile",
+        `${API_URL}/doctors/profile`,
         {
           method: "PUT",
           headers: {

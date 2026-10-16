@@ -7,6 +7,7 @@ import {
   ClockIcon,
   PillIcon,
 } from "../components/Icons";
+import { API_URL } from "../config";
 
 const createMedicine = () => ({
   id: `${Date.now()}-${Math.random()}`,
@@ -117,7 +118,7 @@ function DoctorConsultation() {
       setSuccess("");
 
       const response = await fetch(
-        "http://localhost:5000/api/consultations",
+        `${API_URL}/consultations`,
         {
           method: "POST",
           headers: {

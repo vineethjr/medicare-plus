@@ -19,6 +19,7 @@ import {
   SparklesIcon,
   UserIcon,
 } from "../components/Icons";
+import { API_URL } from "../config";
 
 const COMMON_ALLERGIES = [
   "No Known Allergies",
@@ -73,7 +74,7 @@ function PatientProfile() {
     async function loadProfile() {
       try {
         setLoading(true);
-        const res = await fetch("http://localhost:5000/api/patient/profile", {
+        const res = await fetch(`${API_URL}/patient/profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -136,7 +137,7 @@ function PatientProfile() {
     setMessage({ text: "", type: "" });
 
     try {
-      const res = await fetch("http://localhost:5000/api/patient/profile", {
+      const res = await fetch(`${API_URL}/patient/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

@@ -23,6 +23,7 @@ import {
   VideoIcon,
   XIcon,
 } from "../components/Icons";
+import { API_URL } from "../config";
 
 function DoctorDashboard() {
   const navigate = useNavigate();
@@ -51,10 +52,10 @@ function DoctorDashboard() {
         setLoading(true);
 
         const [statsRes, apptsRes] = await Promise.all([
-          fetch("http://localhost:5000/api/appointments/doctor/stats", {
+          fetch(`${API_URL}/appointments/doctor/stats`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("http://localhost:5000/api/appointments/doctor", {
+          fetch(`${API_URL}/appointments/doctor`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -86,7 +87,7 @@ function DoctorDashboard() {
   async function handleStatusUpdate(id, newStatus) {
     try {
       setActionLoading(id);
-      const res = await fetch(`http://localhost:5000/api/appointments/${id}/status`, {
+      const res = await fetch(`${API_URL}/appointments/${id}/status`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -102,7 +103,7 @@ function DoctorDashboard() {
           )
         );
         // Refresh stats
-        const statsRes = await fetch("http://localhost:5000/api/appointments/doctor/stats", {
+        const statsRes = await fetch(`${API_URL}/appointments/doctor/stats`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (statsRes.ok) {

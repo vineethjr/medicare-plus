@@ -20,6 +20,7 @@ import {
   VideoIcon,
   XIcon,
 } from "../components/Icons";
+import { API_URL } from "../config";
 
 function FindDoctor() {
   const navigate = useNavigate();
@@ -55,7 +56,7 @@ function FindDoctor() {
         setLoading(true);
         setError("");
 
-        const response = await fetch("http://localhost:5000/api/doctors", {
+        const response = await fetch(`${API_URL}/doctors`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -150,7 +151,7 @@ function FindDoctor() {
       setError("");
       setSuccess("");
 
-      const response = await fetch("http://localhost:5000/api/appointments", {
+      const response = await fetch(`${API_URL}/appointments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

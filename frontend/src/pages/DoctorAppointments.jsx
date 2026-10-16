@@ -14,8 +14,7 @@ import {
   ArrowRightIcon,
   AlertCircleIcon,
 } from "../components/Icons";
-
-const API_URL = "http://localhost:5000/api";
+import { API_URL } from "../config";
 
 function DoctorAppointments() {
   const navigate = useNavigate();

@@ -77,8 +77,8 @@ router.post("/", protect, (req, res) => {
     let meetingLink = null;
 
     if (mode === "Online") {
-      meetingLink =
-        `http://localhost:5173/online-consultation/${appointmentId}`;
+      const clientUrl = (process.env.CLIENT_URL || "http://localhost:5173").replace(/\/$/, "");
+      meetingLink = `${clientUrl}/online-consultation/${appointmentId}`;
 
       db.prepare(`
         UPDATE appointments

@@ -20,8 +20,7 @@ import {
   VideoIcon,
   XIcon,
 } from "../components/Icons";
-
-const API_URL = "http://localhost:5000/api";
+import { API_URL } from "../config";
 
 function readUser() {
   try {
