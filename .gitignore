@@ -28,4 +28,6 @@ Thumbs.db
 # SQLite WAL and SHM
 *.sqlite-shm
 *.sqlite-wal
+/database.sqlite
+
 
