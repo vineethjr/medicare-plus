@@ -306,7 +306,7 @@ function PatientProfile() {
 
               <div className="form-row-three">
                 <div className="input-group">
-                  <label htmlFor="age">Age (Years)</label>
+                  <label htmlFor="age">Age (Years) *</label>
                   <input
                     type="number"
                     id="age"
@@ -316,16 +316,18 @@ function PatientProfile() {
                     placeholder="e.g. 28"
                     value={formData.age}
                     onChange={handleChange}
+                    required
                   />
                 </div>
 
                 <div className="input-group">
-                  <label htmlFor="gender">Biological Sex / Gender</label>
+                  <label htmlFor="gender">Biological Sex / Gender *</label>
                   <select
                     id="gender"
                     name="gender"
                     value={formData.gender}
                     onChange={handleChange}
+                    required
                   >
                     <option value="">Select Gender</option>
                     <option value="Male">Male</option>
@@ -337,7 +339,7 @@ function PatientProfile() {
                 </div>
 
                 <div className="input-group">
-                  <label htmlFor="blood_group">Blood Group</label>
+                  <label htmlFor="blood_group">Blood Group *</label>
                   <select
                     id="blood_group"
                     name="blood_group"
@@ -558,7 +560,7 @@ function PatientProfile() {
                 </div>
 
                 <div className="input-group">
-                  <label htmlFor="emergency_contact_phone">Primary Emergency Phone</label>
+                  <label htmlFor="emergency_contact_phone">Primary Emergency Phone *</label>
                   <input
                     type="tel"
                     id="emergency_contact_phone"
@@ -566,6 +568,7 @@ function PatientProfile() {
                     placeholder="e.g. +91 98765 43210"
                     value={formData.emergency_contact_phone}
                     onChange={handleChange}
+                    required
                   />
                 </div>
               </div>

@@ -40,6 +40,12 @@ function FindDoctor() {
   const [verifyingDoctor, setVerifyingDoctor] = useState(null);
   const [inspectingDoc, setInspectingDoc] = useState(null);
 
+  // Profile completion enforcement state
+  const [patientProfile, setPatientProfile] = useState(null);
+  const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
+  const [showIncompleteProfileModal, setShowIncompleteProfileModal] = useState(false);
+  const [attemptedDoctor, setAttemptedDoctor] = useState(null);
+
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
   const [symptoms, setSymptoms] = useState("");
@@ -53,6 +59,7 @@ function FindDoctor() {
   const [success, setSuccess] = useState("");
 
   const token = localStorage.getItem("token");
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   // Fetch doctors
   useEffect(() => {
@@ -81,8 +88,32 @@ function FindDoctor() {
       }
     }
 
+    async function checkPatientProfile() {
+      if (user.role !== "patient") return;
+      try {
+        const res = await fetch(`${API_URL}/patient/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (res.ok) {
+          const profileData = await res.json();
+          setPatientProfile(profileData);
+          const isIncomplete =
+            !profileData.age ||
+            !profileData.gender ||
+            !profileData.blood_group ||
+            !profileData.emergency_contact_phone;
+          setIsProfileIncomplete(isIncomplete);
+        }
+      } catch (err) {
+        console.error("Failed to check patient profile:", err);
+      }
+    }
+
     fetchDoctors();
-  }, [token]);
+    checkPatientProfile();
+  }, [token, user.role]);
 
   // Specialization list
   const specializations = [
@@ -124,6 +155,11 @@ function FindDoctor() {
 
   // Open booking form
   function openBookingForm(doctor) {
+    if (user.role === "patient" && isProfileIncomplete) {
+      setAttemptedDoctor(doctor);
+      setShowIncompleteProfileModal(true);
+      return;
+    }
     setSelectedDoctor(doctor);
     setAppointmentDate("");
     setAppointmentTime("");
@@ -174,6 +210,12 @@ function FindDoctor() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.profileIncomplete) {
+          setIsProfileIncomplete(true);
+          setSelectedDoctor(null);
+          setShowIncompleteProfileModal(true);
+          return;
+        }
         throw new Error(data.message || "Failed to book appointment");
       }
 
@@ -229,6 +271,31 @@ function FindDoctor() {
             onClick={() => navigate("/find-doctor")}
           >
             Clear Filter
+          </button>
+        </div>
+      )}
+
+      {/* INCOMPLETE PROFILE MANDATORY NOTICE BANNER */}
+      {isProfileIncomplete && (
+        <div className="incomplete-profile-banner">
+          <div className="incomplete-banner-left">
+            <div className="incomplete-banner-icon">
+              <AlertCircleIcon size={22} />
+            </div>
+            <div>
+              <strong>Action Required: Complete Your Medical Profile to Book Appointments</strong>
+              <p>
+                Clinical safety protocols require patients to record their medical history, blood group, age, and emergency contact before scheduling appointments with doctors.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn-go-complete-profile"
+            onClick={() => navigate("/patient-profile")}
+          >
+            <span>Complete Profile Now</span>
+            <ArrowRightIcon size={15} />
           </button>
         </div>
       )}
@@ -792,6 +859,83 @@ function FindDoctor() {
                 onClick={() => setInspectingDoc(null)}
               >
                 Close Inspection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* INCOMPLETE MEDICAL PROFILE ENFORCEMENT MODAL */}
+      {showIncompleteProfileModal && (
+        <div
+          className="booking-overlay"
+          onClick={() => setShowIncompleteProfileModal(false)}
+        >
+          <div
+            className="incomplete-profile-modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="incomplete-modal-header">
+              <div className="incomplete-icon-box">
+                <AlertCircleIcon size={26} />
+              </div>
+              <button
+                className="close-modal-btn"
+                onClick={() => setShowIncompleteProfileModal(false)}
+              >
+                <XIcon size={18} />
+              </button>
+            </div>
+
+            <div className="incomplete-modal-content">
+              <h2>Medical Profile Completion Required</h2>
+              {attemptedDoctor && (
+                <div className="attempted-doc-banner">
+                  Booking request for <strong>Dr. {attemptedDoctor.name}</strong> ({attemptedDoctor.specialization || "Specialist"}) is on hold.
+                </div>
+              )}
+              <p className="incomplete-lead-text">
+                To uphold strict patient clinical safety standards, MediCare+ requires patients to fill out their basic health information before scheduling consultations. Doctors must review your medical history and vital stats before confirming appointments.
+              </p>
+
+              <div className="missing-fields-checklist">
+                <h4>Mandatory Baseline Health Data:</h4>
+                <div className="checklist-grid">
+                  <div className={`check-item ${patientProfile?.age ? "done" : "missing"}`}>
+                    <CheckCircleIcon size={16} />
+                    <span>Patient Age {patientProfile?.age ? `(${patientProfile.age} yrs)` : "(Missing)"}</span>
+                  </div>
+                  <div className={`check-item ${patientProfile?.gender ? "done" : "missing"}`}>
+                    <CheckCircleIcon size={16} />
+                    <span>Biological Gender {patientProfile?.gender ? `(${patientProfile.gender})` : "(Missing)"}</span>
+                  </div>
+                  <div className={`check-item ${patientProfile?.blood_group ? "done" : "missing"}`}>
+                    <CheckCircleIcon size={16} />
+                    <span>Blood Group {patientProfile?.blood_group ? `(${patientProfile.blood_group})` : "(Missing)"}</span>
+                  </div>
+                  <div className={`check-item ${patientProfile?.emergency_contact_phone ? "done" : "missing"}`}>
+                    <CheckCircleIcon size={16} />
+                    <span>Emergency Contact {patientProfile?.emergency_contact_phone ? "(Provided)" : "(Missing)"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="incomplete-modal-actions">
+              <button
+                type="button"
+                className="btn-modal-cancel"
+                onClick={() => setShowIncompleteProfileModal(false)}
+              >
+                Return to Directory
+              </button>
+              <button
+                type="button"
+                className="btn-modal-go-profile"
+                onClick={() => navigate("/patient-profile")}
+              >
+                <span>Complete Medical Profile</span>
+                <ArrowRightIcon size={16} />
               </button>
             </div>
           </div>

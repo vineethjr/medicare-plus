@@ -32,6 +32,27 @@ router.post("/", protect, (req, res) => {
       });
     }
 
+    // STRICT CHECK: Verify patient has completed medical profile
+    const patientProfile = db.prepare(`
+      SELECT age, gender, blood_group, emergency_contact_phone
+      FROM users
+      WHERE id = ? AND role = 'patient'
+    `).get(req.user.id);
+
+    if (
+      !patientProfile ||
+      !patientProfile.age ||
+      !patientProfile.gender ||
+      !patientProfile.blood_group ||
+      !patientProfile.emergency_contact_phone
+    ) {
+      return res.status(403).json({
+        message:
+          "Incomplete patient profile. Clinical safety protocol requires you to complete your medical profile (age, gender, blood group, emergency contact) before booking an appointment with any doctor.",
+        profileIncomplete: true,
+      });
+    }
+
     const mode =
       consultation_mode === "Online" ? "Online" : "Offline";
 
