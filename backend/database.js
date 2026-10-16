@@ -261,29 +261,73 @@ db.exec(`
 
 function seedInitialDataIfEmpty() {
   try {
+    const bcrypt = require("bcryptjs");
+    const defaultPassword = bcrypt.hashSync("Doctor123!", 10);
+
+    const insertUser = db.prepare(`
+      INSERT INTO users (
+        name, email, password, role,
+        specialization, qualification, experience, consultation_fee,
+        hospital, bio, availability, medical_license, verification_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const insertDoc = db.prepare(`
+      INSERT INTO doctor_documents (
+        doctor_id, document_name, document_type, issuer, issue_year, file_url, file_name, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Verified')
+    `);
+
+    // Doctor 1: Dr. Raju
+    const existingRaju = db
+      .prepare("SELECT id FROM users WHERE email = ?")
+      .get("raju@medicare.com");
+
+    if (!existingRaju) {
+      const docRaju = insertUser.run(
+        "Raju",
+        "raju@medicare.com",
+        defaultPassword,
+        "doctor",
+        "General Physician",
+        "MBBS, MD (General Medicine)",
+        12,
+        500,
+        "City Medical Institute",
+        "Senior General Physician with over 12 years of clinical experience in comprehensive primary care, family medicine, and health diagnostics.",
+        "Monday - Saturday, 09:00 AM - 05:00 PM",
+        "MCI-2014-RAJ-8812",
+        "Verified"
+      );
+
+      insertDoc.run(
+        docRaju.lastInsertRowid,
+        "MBBS & MD Specialist Degree",
+        "Degree Certificate",
+        "State University of Health Sciences",
+        "2014",
+        "sample://dr-raju-degree.pdf",
+        "Dr_Raju_MD_Degree.pdf"
+      );
+
+      insertDoc.run(
+        docRaju.lastInsertRowid,
+        "State Medical Council Registration Certificate",
+        "Medical License / Registration",
+        "State Medical Council & Directorate of Medical Education",
+        "2015",
+        "sample://dr-raju-license.pdf",
+        "Dr_Raju_Medical_License.pdf"
+      );
+      console.log("Seeded Dr. Raju successfully");
+    }
+
+    // Doctor 2: Dr. Sarah Jenkins
     const existingJenkins = db
       .prepare("SELECT id FROM users WHERE email = ?")
       .get("sarah.jenkins@medicare.com");
 
     if (!existingJenkins) {
-      const bcrypt = require("bcryptjs");
-      const defaultPassword = bcrypt.hashSync("Doctor123!", 10);
-
-      const insertUser = db.prepare(`
-        INSERT INTO users (
-          name, email, password, role,
-          specialization, qualification, experience, consultation_fee,
-          hospital, bio, availability, medical_license, verification_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      const insertDoc = db.prepare(`
-        INSERT INTO doctor_documents (
-          doctor_id, document_name, document_type, issuer, issue_year, file_url, file_name, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Verified')
-      `);
-
-      // Doctor 1: Dr. Sarah Jenkins
       const doc1 = insertUser.run(
         "Sarah Jenkins",
         "sarah.jenkins@medicare.com",
@@ -319,8 +363,14 @@ function seedInitialDataIfEmpty() {
         "sample://cardio-board-license.pdf",
         "MCI_Cardio_License_8492.pdf"
       );
+    }
 
-      // Doctor 2: Dr. Michael Vance
+    // Doctor 3: Dr. Michael Vance
+    const existingVance = db
+      .prepare("SELECT id FROM users WHERE email = ?")
+      .get("michael.vance@medicare.com");
+
+    if (!existingVance) {
       const doc2 = insertUser.run(
         "Michael Vance",
         "michael.vance@medicare.com",
@@ -356,8 +406,14 @@ function seedInitialDataIfEmpty() {
         "sample://aan-fellowship-cert.pdf",
         "AAN_Fellowship_Credential.pdf"
       );
+    }
 
-      // Doctor 3: Dr. Emily Chen
+    // Doctor 4: Dr. Emily Chen
+    const existingChen = db
+      .prepare("SELECT id FROM users WHERE email = ?")
+      .get("emily.chen@medicare.com");
+
+    if (!existingChen) {
       const doc3 = insertUser.run(
         "Emily Chen",
         "emily.chen@medicare.com",
@@ -383,46 +439,9 @@ function seedInitialDataIfEmpty() {
         "sample://stanford-md-pediatrics.pdf",
         "Stanford_MD_Pediatrics.pdf"
       );
-
-      // Doctor 4: Dr. Raju
-      const doc4 = insertUser.run(
-        "Raju",
-        "raju@medicare.com",
-        defaultPassword,
-        "doctor",
-        "General Physician",
-        "MBBS, MD (General Medicine)",
-        12,
-        500,
-        "City Medical Institute",
-        "Senior General Physician with over 12 years of clinical experience in comprehensive primary care, family medicine, and health diagnostics.",
-        "Monday - Saturday, 09:00 AM - 05:00 PM",
-        "MCI-2014-RAJ-8812",
-        "Verified"
-      );
-
-      insertDoc.run(
-        doc4.lastInsertRowid,
-        "MBBS & MD Specialist Degree",
-        "Degree Certificate",
-        "State University of Health Sciences",
-        "2014",
-        "sample://dr-raju-degree.pdf",
-        "Dr_Raju_MD_Degree.pdf"
-      );
-
-      insertDoc.run(
-        doc4.lastInsertRowid,
-        "State Medical Council Registration Certificate",
-        "Medical License / Registration",
-        "State Medical Council & Directorate of Medical Education",
-        "2015",
-        "sample://dr-raju-license.pdf",
-        "Dr_Raju_Medical_License.pdf"
-      );
-
-      console.log("Database initialized with verified starter doctors and credentials.");
     }
+
+    console.log("Database checked and seeded with verified doctors.");
   } catch (err) {
     console.error("Error seeding initial data:", err.message);
   }

@@ -167,8 +167,8 @@ function FindDoctor() {
     const searchText = search.toLowerCase().trim();
 
     const doctorName = doctor.name?.toLowerCase().trim() || "";
-    const doctorSpecialization = doctor.specialization?.toLowerCase().trim() || "";
-    const doctorHospital = doctor.hospital?.toLowerCase().trim() || "";
+    const doctorSpecialization = (doctor.specialization || "General Physician").toLowerCase().trim();
+    const doctorHospital = (doctor.hospital || "Clinical Center").toLowerCase().trim();
 
     const matchesSearch =
       !searchText ||

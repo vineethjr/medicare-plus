@@ -35,11 +35,23 @@ router.post("/register", async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const result = db
-      .prepare(
-        "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)"
-      )
-      .run(name, email, hashedPassword, role);
+    let result;
+    if (role === "doctor") {
+      result = db
+        .prepare(
+          `INSERT INTO users (
+            name, email, password, role,
+            specialization, qualification, hospital, consultation_fee, experience, availability, verification_status
+          ) VALUES (?, ?, ?, 'doctor', 'General Physician', 'MBBS', 'MediCare+ Clinical Center', 500, 1, 'Mon - Fri, 09:00 AM - 05:00 PM', 'Verified')`
+        )
+        .run(name, email, hashedPassword);
+    } else {
+      result = db
+        .prepare(
+          "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)"
+        )
+        .run(name, email, hashedPassword, role);
+    }
 
     res.status(201).json({
       message: "Account created successfully",
