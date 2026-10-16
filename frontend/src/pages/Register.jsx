@@ -100,7 +100,7 @@ function Register() {
         );
       } else {
         setError(
-          "Unable to connect to MediCare+ service. Please verify the backend is running."
+          "Unable to connect to MediCare+ service. Free servers may take ~30 seconds to wake up from sleep. Please wait a moment and try again."
         );
       }
     } finally {
