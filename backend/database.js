@@ -384,6 +384,43 @@ function seedInitialDataIfEmpty() {
         "Stanford_MD_Pediatrics.pdf"
       );
 
+      // Doctor 4: Dr. Raju
+      const doc4 = insertUser.run(
+        "Raju",
+        "raju@medicare.com",
+        defaultPassword,
+        "doctor",
+        "General Physician",
+        "MBBS, MD (General Medicine)",
+        12,
+        500,
+        "City Medical Institute",
+        "Senior General Physician with over 12 years of clinical experience in comprehensive primary care, family medicine, and health diagnostics.",
+        "Monday - Saturday, 09:00 AM - 05:00 PM",
+        "MCI-2014-RAJ-8812",
+        "Verified"
+      );
+
+      insertDoc.run(
+        doc4.lastInsertRowid,
+        "MBBS & MD Specialist Degree",
+        "Degree Certificate",
+        "State University of Health Sciences",
+        "2014",
+        "sample://dr-raju-degree.pdf",
+        "Dr_Raju_MD_Degree.pdf"
+      );
+
+      insertDoc.run(
+        doc4.lastInsertRowid,
+        "State Medical Council Registration Certificate",
+        "Medical License / Registration",
+        "State Medical Council & Directorate of Medical Education",
+        "2015",
+        "sample://dr-raju-license.pdf",
+        "Dr_Raju_Medical_License.pdf"
+      );
+
       console.log("Database initialized with verified starter doctors and credentials.");
     }
   } catch (err) {
