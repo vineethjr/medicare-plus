@@ -7,7 +7,7 @@ import {
   AlertCircleIcon,
   ArrowRightIcon,
 } from "../components/Icons";
-import { API_URL } from "../config";
+import { API_URL, BACKEND_URL } from "../config";
 import "./Login.css";
 
 function Login() {
@@ -59,10 +59,20 @@ function Login() {
       } else {
         navigate("/patient-dashboard");
       }
-    } catch {
-      setError(
-        "Unable to connect to MediCare+ service. Please verify the backend is running."
-      );
+    } catch (err) {
+      if (
+        typeof window !== "undefined" &&
+        window.location.hostname !== "localhost" &&
+        BACKEND_URL.includes("localhost")
+      ) {
+        setError(
+          "Backend URL is not configured. In Vercel Project Settings > Environment Variables, set VITE_BACKEND_URL to your deployed backend URL (e.g. on Render) and redeploy."
+        );
+      } else {
+        setError(
+          "Unable to connect to MediCare+ service. Please verify the backend is running."
+        );
+      }
     } finally {
       setLoading(false);
     }
