@@ -16,6 +16,7 @@ import DoctorConsultation from "./pages/DoctorConsultation";
 import PatientMedicalRecords from "./pages/PatientMedicalRecords";
 import DoctorMedicalRecords from "./pages/DoctorMedicalRecords";
 import OnlineConsultation from "./pages/OnlineConsultation";
+import PatientProfile from "./pages/PatientProfile";
 
 import "./index.css";
 
@@ -66,6 +67,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 <Route
   path="/online-consultation/:appointmentId"
   element={<OnlineConsultation />}
+/>
+<Route
+  path="/consultation/:appointmentId"
+  element={<OnlineConsultation />}
+/>
+<Route
+  path="/patient-profile"
+  element={<PatientProfile />}
 />
       </Routes>
       

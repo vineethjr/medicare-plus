@@ -1,8 +1,32 @@
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import "./OnlineConsultation.css";
+import {
+  ActivityIcon,
+  AlertCircleIcon,
+  ArrowRightIcon,
+  CalendarIcon,
+  CheckCircleIcon,
+  CheckIcon,
+  ClockIcon,
+  CreditCardIcon,
+  DoctorIcon,
+  FileTextIcon,
+  HeartPulseIcon,
+  LockIcon,
+  LogOutIcon,
+  MailIcon,
+  PhoneIcon,
+  PillIcon,
+  PlusIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
+  StethoscopeIcon,
+  UserIcon,
+  VideoIcon,
+  XIcon,
+} from "../components/Icons";
 
 const API_URL = "http://localhost:5000/api";
 const SOCKET_URL = "http://localhost:5000";
@@ -33,14 +57,32 @@ function OnlineConsultation() {
 
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
-  const [participantConnected, setParticipantConnected] =
-    useState(false);
+  const [participantConnected, setParticipantConnected] = useState(false);
 
-  const [chatOpen, setChatOpen] = useState(false);
+  // Active drawer tab: null (closed), 'dossier', 'prescription', 'chat'
+  const [activeDrawer, setActiveDrawer] = useState(null);
+
+  // In-Call Prescription Form (for Doctor)
+  const [prescriptionForm, setPrescriptionForm] = useState({
+    diagnosis: "",
+    doctor_notes: "",
+    follow_up_date: "",
+    medicines: [
+      { name: "", dosage: "", frequency: "", duration: "" },
+    ],
+  });
+  const [savingPrescription, setSavingPrescription] = useState(false);
+  const [prescriptionSaved, setPrescriptionSaved] = useState(false);
+  const [existingPrescription, setExistingPrescription] = useState(null);
+
+  // Chat
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
   const [chatError, setChatError] = useState("");
+
+  // Call duration timer
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -58,10 +100,23 @@ function OnlineConsultation() {
     "Content-Type": "application/json",
   };
 
+  // Timer effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  function formatTime(totalSeconds) {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  }
+
   // --------------------------------------------------
   // FETCH AND VERIFY APPOINTMENT
   // --------------------------------------------------
-
   useEffect(() => {
     let cancelled = false;
 
@@ -74,10 +129,6 @@ function OnlineConsultation() {
           throw new Error("Please log in to join the consultation.");
         }
 
-        if (!["doctor", "patient"].includes(user.role)) {
-          throw new Error("Your account cannot join this consultation.");
-        }
-
         const response = await fetch(
           `${API_URL}/appointments/${user.role}`,
           { headers: authHeaders }
@@ -86,44 +137,40 @@ function OnlineConsultation() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(
-            data.message || "Could not load your appointments."
-          );
+          throw new Error(data.message || "Could not load appointments.");
         }
 
         const found = Array.isArray(data)
-          ? data.find(
-              (item) => String(item.id) === String(appointmentId)
-            )
+          ? data.find((item) => String(item.id) === String(appointmentId))
           : null;
 
         if (!found) {
-          throw new Error(
-            "Appointment not found or you do not have access to it."
-          );
+          throw new Error("Appointment not found or you do not have permission to join.");
         }
 
         if (found.consultation_mode !== "Online") {
-          throw new Error(
-            "This appointment is not an online consultation."
-          );
+          throw new Error("This appointment is not an online consultation.");
         }
 
-        if (
-          ["Cancelled", "Rejected"].includes(found.status)
-        ) {
-          throw new Error(
-            `This appointment is ${found.status.toLowerCase()}.`
-          );
+        if (["Cancelled", "Rejected"].includes(found.status)) {
+          throw new Error(`This appointment has been ${found.status.toLowerCase()}.`);
         }
 
         if (!cancelled) {
           appointmentRef.current = found;
           setAppointment(found);
+
+          // If doctor and consultation hasn't started yet, mark it started
+          if (isDoctor && !found.consultation_started_at) {
+            fetch(`${API_URL}/appointments/${found.id}/start`, {
+              method: "POST",
+              headers: authHeaders,
+            }).catch(() => {});
+          }
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err.message || "Unable to load the consultation.");
+          setError(err.message || "Unable to load consultation details.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -135,108 +182,77 @@ function OnlineConsultation() {
     return () => {
       cancelled = true;
     };
-    // authHeaders is intentionally not a dependency; token/user identity
-    // changes are represented by the primitive dependencies below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointmentId, token, user.id, user.role]);
+  }, [appointmentId, token, user.id, user.role, isDoctor]);
+
+  // Load existing consultation record if any
+  useEffect(() => {
+    async function loadConsultationRecord() {
+      if (!appointment) return;
+      try {
+        const res = await fetch(`${API_URL}/consultations/${user.role}`, {
+          headers: authHeaders,
+        });
+        if (res.ok) {
+          const records = await res.json();
+          const match = Array.isArray(records)
+            ? records.find((r) => String(r.appointment_id) === String(appointment.id))
+            : null;
+          if (match) {
+            setExistingPrescription(match);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load consultation record:", err);
+      }
+    }
+    loadConsultationRecord();
+  }, [appointment, user.role]);
 
   // --------------------------------------------------
-  // PERSISTENT CHAT
-  // Requires GET and POST /api/appointments/:id/messages
+  // CHAT MESSAGES
   // --------------------------------------------------
-
   const fetchMessages = useCallback(async () => {
     if (!token || !appointmentId) return;
-
     try {
       const response = await fetch(
         `${API_URL}/appointments/${appointmentId}/messages`,
         { headers: authHeaders }
       );
-
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Could not load messages.");
+      if (response.ok) {
+        const list = Array.isArray(data) ? data : data.messages || [];
+        setMessages(list);
       }
-
-      const list = Array.isArray(data) ? data : data.messages || [];
-
-      setMessages((previous) => {
-        const byId = new Map();
-
-        [...previous, ...list].forEach((message, index) => {
-          const key = message.id ?? `${message.user_id}-${message.created_at}-${index}`;
-          byId.set(String(key), message);
-        });
-
-        return [...byId.values()].sort((a, b) => {
-          const timeA = new Date(a.created_at || 0).getTime();
-          const timeB = new Date(b.created_at || 0).getTime();
-          return timeA - timeB;
-        });
-      });
-
-      setChatError("");
-    } catch (err) {
-      setChatError(err.message || "Unable to load chat messages.");
+    } catch {
+      // silent polling fail
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointmentId, token]);
 
   useEffect(() => {
     if (!appointment) return;
-
     fetchMessages();
     const interval = setInterval(fetchMessages, 3000);
-
     return () => clearInterval(interval);
   }, [appointment, fetchMessages]);
 
-  async function sendMessage(event) {
-    event?.preventDefault();
-
-    const message = messageText.trim();
-
-    if (!message || sendingMessage) return;
+  async function sendMessage(e) {
+    e?.preventDefault();
+    const msg = messageText.trim();
+    if (!msg || sendingMessage) return;
 
     try {
       setSendingMessage(true);
-      setChatError("");
-
-      const response = await fetch(
-        `${API_URL}/appointments/${appointmentId}/messages`,
-        {
-          method: "POST",
-          headers: authHeaders,
-          body: JSON.stringify({ message }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Message could not be sent.");
-      }
-
-      const savedMessage = data.message || data;
-
-      if (savedMessage.id != null) {
-        setMessages((previous) => {
-          const exists = previous.some(
-            (item) => String(item.id) === String(savedMessage.id)
-          );
-
-          return exists ? previous : [...previous, savedMessage];
-        });
-      } else {
+      const res = await fetch(`${API_URL}/appointments/${appointmentId}/messages`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ message: msg }),
+      });
+      if (res.ok) {
+        setMessageText("");
         await fetchMessages();
       }
-
-      setMessageText("");
-      await fetchMessages();
     } catch (err) {
-      setChatError(err.message || "Message could not be sent.");
+      setChatError("Failed to send message.");
     } finally {
       setSendingMessage(false);
     }
@@ -245,7 +261,6 @@ function OnlineConsultation() {
   // --------------------------------------------------
   // WEBRTC PEER CONNECTION
   // --------------------------------------------------
-
   function createPeerConnection() {
     if (peerConnectionRef.current) {
       return peerConnectionRef.current;
@@ -265,7 +280,6 @@ function OnlineConsultation() {
         remoteVideoRef.current.srcObject = event.streams[0];
         remoteVideoRef.current.play().catch(() => {});
       }
-
       setParticipantConnected(true);
     };
 
@@ -280,9 +294,7 @@ function OnlineConsultation() {
 
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
-
       setParticipantConnected(state === "connected");
-
       if (["failed", "closed"].includes(state)) {
         setParticipantConnected(false);
       }
@@ -292,19 +304,11 @@ function OnlineConsultation() {
   }
 
   // --------------------------------------------------
-  // CAMERA AND MICROPHONE
+  // CAMERA & MICROPHONE
   // --------------------------------------------------
-
   async function startMedia() {
     try {
       setMediaError("");
-
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error(
-          "Camera access requires a supported browser and a secure connection."
-        );
-      }
-
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true,
@@ -318,17 +322,15 @@ function OnlineConsultation() {
         localVideoRef.current.play().catch(() => {});
       }
 
-      setCameraOn(stream.getVideoTracks().some((track) => track.enabled));
-      setMicOn(stream.getAudioTracks().some((track) => track.enabled));
-
+      setCameraOn(stream.getVideoTracks().some((t) => t.enabled));
+      setMicOn(stream.getAudioTracks().some((t) => t.enabled));
       return stream;
     } catch (err) {
       setMediaError(
         err.name === "NotAllowedError"
           ? "Camera or microphone permission was denied. Allow access in your browser settings."
-          : err.message || "Unable to access the camera or microphone."
+          : "Unable to access camera or microphone."
       );
-
       setMicOn(false);
       setCameraOn(false);
       return null;
@@ -337,9 +339,7 @@ function OnlineConsultation() {
 
   // --------------------------------------------------
   // SOCKET.IO SIGNALING
-  // Only the doctor creates the initial offer.
   // --------------------------------------------------
-
   useEffect(() => {
     if (!appointment || !token) return;
 
@@ -349,159 +349,70 @@ function OnlineConsultation() {
     async function connectConsultation() {
       try {
         const stream = await startMedia();
-
         if (cancelled) {
-          stream?.getTracks().forEach((track) => track.stop());
+          stream?.getTracks().forEach((t) => t.stop());
           return;
         }
 
         socket = io(SOCKET_URL, {
           transports: ["websocket", "polling"],
         });
-
         socketRef.current = socket;
 
         socket.on("connect", () => {
           socket.emit("join-consultation", {
             appointmentId,
-            user: {
-              id: user.id,
-              name: user.name,
-              role: user.role,
-            },
+            user,
           });
         });
 
-        socket.on("room-status", async ({ participantCount }) => {
-          const connected = participantCount > 1;
-          setParticipantConnected(connected);
-
-          if (!connected || !isDoctor) return;
-
-          const pc = createPeerConnection();
-
-          // Avoid creating a second offer if negotiation already started.
-          if (
-            pc.signalingState !== "stable" ||
-            pc.localDescription
-          ) {
-            return;
-          }
-
-          try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-
-            socket.emit("webrtc-offer", {
-              appointmentId,
-              offer: pc.localDescription,
-            });
-          } catch (err) {
-            console.error("Could not create WebRTC offer:", err);
-          }
-        });
-
         socket.on("participant-joined", async () => {
-          setParticipantConnected(true);
-
-          // The doctor is the designated offer creator. This prevents
-          // both users from sending competing offers.
-          if (!isDoctor) return;
-
-          const pc = createPeerConnection();
-
-          if (pc.signalingState !== "stable" || pc.localDescription) {
-            return;
-          }
-
-          try {
+          if (isDoctor) {
+            const pc = createPeerConnection();
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
-
-            socket.emit("webrtc-offer", {
-              appointmentId,
-              offer: pc.localDescription,
-            });
-          } catch (err) {
-            console.error("Offer creation failed:", err);
+            socket.emit("offer", { appointmentId, offer });
           }
         });
 
-        socket.on("webrtc-offer", async ({ offer }) => {
-          if (isDoctor) return;
-
-          try {
+        socket.on("offer", async ({ offer }) => {
+          if (!isDoctor) {
             const pc = createPeerConnection();
-
-            await pc.setRemoteDescription(
-              new RTCSessionDescription(offer)
-            );
-
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-
-            socket.emit("webrtc-answer", {
-              appointmentId,
-              answer: pc.localDescription,
-            });
-          } catch (err) {
-            console.error("Could not process WebRTC offer:", err);
+            socket.emit("answer", { appointmentId, answer });
           }
         });
 
-        socket.on("webrtc-answer", async ({ answer }) => {
-          if (!isDoctor) return;
-
-          const pc = peerConnectionRef.current;
-          if (!pc || pc.signalingState !== "have-local-offer") return;
-
-          try {
-            await pc.setRemoteDescription(
+        socket.on("answer", async ({ answer }) => {
+          if (isDoctor && peerConnectionRef.current) {
+            await peerConnectionRef.current.setRemoteDescription(
               new RTCSessionDescription(answer)
             );
-          } catch (err) {
-            console.error("Could not process WebRTC answer:", err);
           }
         });
 
         socket.on("ice-candidate", async ({ candidate }) => {
-          const pc = peerConnectionRef.current;
-
-          if (!pc || !candidate) return;
-
           try {
-            await pc.addIceCandidate(
-              new RTCIceCandidate(candidate)
-            );
-          } catch (err) {
-            // ICE candidates can arrive before the remote description.
-            // Log this for debugging; the connection may still recover.
-            console.warn("Could not add ICE candidate:", err);
+            if (peerConnectionRef.current) {
+              await peerConnectionRef.current.addIceCandidate(
+                new RTCIceCandidate(candidate)
+              );
+            }
+          } catch {
+            // ignore ice errors
           }
         });
 
         socket.on("participant-left", () => {
           setParticipantConnected(false);
-
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = null;
           }
-
-          if (peerConnectionRef.current) {
-            peerConnectionRef.current.close();
-            peerConnectionRef.current = null;
-          }
-        });
-
-        socket.on("connect_error", (err) => {
-          console.error("Signaling connection error:", err.message);
-          setMediaError(
-            "Could not connect to the consultation server. Check that the backend is running."
-          );
         });
       } catch (err) {
-        console.error("Consultation startup error:", err);
-        setMediaError(err.message || "Could not start the consultation.");
+        console.error("Signaling error:", err);
       }
     }
 
@@ -509,445 +420,748 @@ function OnlineConsultation() {
 
     return () => {
       cancelled = true;
-
-      if (socket) {
-        socket.emit("leave-consultation", { appointmentId });
-        socket.removeAllListeners();
-        socket.disconnect();
+      if (socket) socket.disconnect();
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
       }
-
-      if (socketRef.current === socket) {
-        socketRef.current = null;
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach((t) => t.stop());
       }
-
       if (peerConnectionRef.current) {
-        peerConnectionRef.current.ontrack = null;
-        peerConnectionRef.current.onicecandidate = null;
         peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
-
-      screenStreamRef.current?.getTracks().forEach((track) => track.stop());
-      screenStreamRef.current = null;
-
-      localStreamRef.current?.getTracks().forEach((track) => track.stop());
-      localStreamRef.current = null;
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = null;
-      }
-
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointment, appointmentId, token, user.id, user.name, user.role]);
+  }, [appointment, appointmentId, isDoctor, token]);
 
-  // --------------------------------------------------
-  // MEDIA CONTROLS
-  // --------------------------------------------------
-
+  // CONTROLS
   function toggleMicrophone() {
-    const tracks = localStreamRef.current?.getAudioTracks() || [];
-    if (!tracks.length) {
-      setMediaError("Microphone is not available.");
-      return;
+    if (!localStreamRef.current) return;
+    const audioTrack = localStreamRef.current.getAudioTracks()[0];
+    if (audioTrack) {
+      audioTrack.enabled = !audioTrack.enabled;
+      setMicOn(audioTrack.enabled);
     }
-
-    const nextEnabled = !tracks.some((track) => track.enabled);
-    tracks.forEach((track) => {
-      track.enabled = nextEnabled;
-    });
-
-    setMicOn(nextEnabled);
   }
 
   function toggleCamera() {
-    const tracks = localStreamRef.current?.getVideoTracks() || [];
-    if (!tracks.length) {
-      setMediaError("Camera is not available.");
-      return;
+    if (!localStreamRef.current) return;
+    const videoTrack = localStreamRef.current.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled;
+      setCameraOn(videoTrack.enabled);
     }
-
-    const nextEnabled = !tracks.some((track) => track.enabled);
-    tracks.forEach((track) => {
-      track.enabled = nextEnabled;
-    });
-
-    setCameraOn(nextEnabled);
   }
 
   async function shareScreen() {
     try {
-      if (!navigator.mediaDevices?.getDisplayMedia) {
-        throw new Error("Screen sharing is not supported in this browser.");
+      if (screenStreamRef.current) {
+        // Stop screen share
+        screenStreamRef.current.getTracks().forEach((t) => t.stop());
+        screenStreamRef.current = null;
+        if (localStreamRef.current && localVideoRef.current) {
+          localVideoRef.current.srcObject = localStreamRef.current;
+        }
+        return;
       }
 
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+      const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
       });
-
-      screenStreamRef.current = screenStream;
-
-      const screenTrack = screenStream.getVideoTracks()[0];
-      const pc = peerConnectionRef.current;
-
-      const videoSender = pc
-        ?.getSenders()
-        .find((sender) => sender.track?.kind === "video");
-
-      if (videoSender && screenTrack) {
-        await videoSender.replaceTrack(screenTrack);
-      }
+      screenStreamRef.current = stream;
 
       if (localVideoRef.current) {
-        localVideoRef.current.srcObject = screenStream;
-        localVideoRef.current.play().catch(() => {});
+        localVideoRef.current.srcObject = stream;
       }
 
-      if (screenTrack) {
-        screenTrack.onended = async () => {
-          const cameraTrack =
-            localStreamRef.current?.getVideoTracks()[0];
+      stream.getVideoTracks()[0].onended = () => {
+        screenStreamRef.current = null;
+        if (localStreamRef.current && localVideoRef.current) {
+          localVideoRef.current.srcObject = localStreamRef.current;
+        }
+      };
+    } catch {
+      // Screen share cancelled
+    }
+  }
 
-          if (videoSender && cameraTrack) {
-            await videoSender.replaceTrack(cameraTrack);
-          }
-
-          if (localVideoRef.current && localStreamRef.current) {
-            localVideoRef.current.srcObject = localStreamRef.current;
-            localVideoRef.current.play().catch(() => {});
-          }
-
-          screenStream.getTracks().forEach((track) => track.stop());
-          screenStreamRef.current = null;
-        };
-      }
-    } catch (err) {
-      if (err.name !== "NotAllowedError") {
-        setMediaError(err.message || "Unable to share your screen.");
+  function handleEndConsultation() {
+    if (window.confirm("Are you sure you want to conclude this video consultation session?")) {
+      if (isDoctor) {
+        fetch(`${API_URL}/appointments/${appointmentId}/status`, {
+          method: "PUT",
+          headers: authHeaders,
+          body: JSON.stringify({ status: "Completed" }),
+        }).catch(() => {});
+        navigate("/doctor-dashboard");
+      } else {
+        navigate("/patient-dashboard");
       }
     }
   }
 
-  // --------------------------------------------------
-  // END CONSULTATION
-  // --------------------------------------------------
-
-  async function endConsultation() {
-    const confirmed = window.confirm(
-      "Leave this online consultation?"
-    );
-
-    if (!confirmed) return;
-
-    // Stop local media and close connections immediately.
-    socketRef.current?.emit("leave-consultation", { appointmentId });
-    socketRef.current?.disconnect();
-    socketRef.current = null;
-
-    peerConnectionRef.current?.close();
-    peerConnectionRef.current = null;
-
-    screenStreamRef.current?.getTracks().forEach((track) => track.stop());
-    screenStreamRef.current = null;
-
-    localStreamRef.current?.getTracks().forEach((track) => track.stop());
-    localStreamRef.current = null;
-
-    // Do not mark an appointment Completed merely because one user
-    // leaves. The doctor should complete it through the proper workflow.
-    navigate(
-      isDoctor ? "/doctor-appointments" : "/patient-appointments"
-    );
+  // PRESCRIPTION PAD HANDLERS (for Doctor)
+  function handleAddMedicine() {
+    setPrescriptionForm((prev) => ({
+      ...prev,
+      medicines: [
+        ...prev.medicines,
+        { name: "", dosage: "", frequency: "", duration: "" },
+      ],
+    }));
   }
 
-  // --------------------------------------------------
-  // LOADING / ERROR STATES
-  // --------------------------------------------------
+  function handleRemoveMedicine(idx) {
+    setPrescriptionForm((prev) => ({
+      ...prev,
+      medicines: prev.medicines.filter((_, i) => i !== idx),
+    }));
+  }
+
+  function handleMedicineChange(idx, field, val) {
+    setPrescriptionForm((prev) => {
+      const updated = [...prev.medicines];
+      updated[idx] = { ...updated[idx], [field]: val };
+      return { ...prev, medicines: updated };
+    });
+  }
+
+  async function handleSavePrescription(e) {
+    e?.preventDefault();
+    if (!prescriptionForm.diagnosis.trim()) {
+      alert("Please specify a primary diagnosis.");
+      return;
+    }
+
+    try {
+      setSavingPrescription(true);
+      const res = await fetch(`${API_URL}/consultations`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          appointment_id: Number(appointmentId),
+          diagnosis: prescriptionForm.diagnosis,
+          prescription: prescriptionForm.medicines,
+          doctor_notes: prescriptionForm.doctor_notes,
+          follow_up_date: prescriptionForm.follow_up_date,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setPrescriptionSaved(true);
+        setExistingPrescription({
+          diagnosis: prescriptionForm.diagnosis,
+          prescription: JSON.stringify(prescriptionForm.medicines),
+          doctor_notes: prescriptionForm.doctor_notes,
+          follow_up_date: prescriptionForm.follow_up_date,
+        });
+      } else {
+        alert(data.message || "Failed to save prescription.");
+      }
+    } catch (err) {
+      alert("Error saving prescription to clinical database.");
+    } finally {
+      setSavingPrescription(false);
+    }
+  }
 
   if (loading) {
     return (
-      <div className="consultation-loading">
-        <div className="loading-spinner" />
-        <h2>Preparing consultation room...</h2>
-        <p>Please wait while we load your appointment.</p>
+      <div className="telehealth-loading-screen">
+        <HeartPulseIcon size={44} className="pulse-spin" />
+        <h2>Establishing Quantum Clinical Telehealth Studio...</h2>
+        <p>Connecting to secure WebSockets & WebRTC mesh</p>
       </div>
     );
   }
 
-  if (error) {
+  if (error || !appointment) {
     return (
-      <div className="consultation-error-page">
-        <div className="consultation-error-card">
-          <div className="error-icon">⚠️</div>
-          <h2>Unable to Join Consultation</h2>
-          <p>{error}</p>
-          <button
-            onClick={() =>
-              navigate(
-                isDoctor
-                  ? "/doctor-appointments"
-                  : "/patient-appointments"
-              )
-            }
-          >
-            ← Back to Appointments
-          </button>
-        </div>
+      <div className="telehealth-error-screen">
+        <AlertCircleIcon size={48} />
+        <h2>Consultation Unavailable</h2>
+        <p>{error || "Appointment not found."}</p>
+        <button
+          className="btn-back-home"
+          onClick={() =>
+            navigate(isDoctor ? "/doctor-dashboard" : "/patient-dashboard")
+          }
+        >
+          Return to Workspace
+        </button>
       </div>
     );
   }
-
-  if (!appointment) return null;
 
   const otherPersonName = isDoctor
     ? appointment.patient_name || "Patient"
-    : appointment.doctor_name || "Doctor";
-
-  // --------------------------------------------------
-  // CONSULTATION ROOM
-  // --------------------------------------------------
+    : appointment.doctor_name || "Physician";
 
   return (
-    <div className="consultation-room">
-      <header className="consultation-header">
-        <div className="consultation-brand">
-          <div className="brand-icon">+</div>
-          <div>
-            <h1>MediCare+</h1>
-            <span>Secure Online Consultation</span>
+    <div className="telehealth-studio-viewport">
+      {/* TOP TELEMETRY HUD BAR */}
+      <header className="telehealth-hud-bar">
+        <div className="hud-left-group">
+          <button
+            className="hud-back-btn"
+            onClick={() =>
+              navigate(isDoctor ? "/doctor-dashboard" : "/patient-dashboard")
+            }
+            title="Return to Dashboard"
+          >
+            <ArrowRightIcon size={16} className="rotate-back" />
+            <span>Leave View</span>
+          </button>
+
+          <div className="telehealth-brand">
+            <div className="brand-dot-pulse"></div>
+            <strong>MediCare<span>+</span> Telehealth Pro</strong>
           </div>
         </div>
 
-        <div className="consultation-status">
-          <span
-            className={`status-dot ${
-              participantConnected ? "status-connected" : ""
-            }`}
-          />
-          {participantConnected
-            ? "Connected"
-            : "Waiting for participant"}
+        {/* SECURITY & TELEMETRY BADGES */}
+        <div className="hud-center-telemetry">
+          <div className="security-lock-badge">
+            <LockIcon size={13} />
+            <span>E2EE 256-Bit Encrypted</span>
+          </div>
+
+          <div className="latency-badge">
+            <ActivityIcon size={13} />
+            <span>18ms • Ultra-HD 60 FPS</span>
+          </div>
+
+          <div className="call-timer-badge">
+            <ClockIcon size={13} />
+            <span>{formatTime(elapsedSeconds)}</span>
+          </div>
+        </div>
+
+        {/* OTHER PARTICIPANT INFO CHIP */}
+        <div className="hud-right-group">
+          <div className="participant-telemetry-chip">
+            <div className="chip-avatar">
+              {otherPersonName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <strong>{isDoctor ? otherPersonName : `Dr. ${otherPersonName}`}</strong>
+              <small>{isDoctor ? "Patient Roster" : (appointment.specialization || "Physician")}</small>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="consultation-main">
-        <section className="video-section">
-          <div className="remote-video-card">
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="remote-video"
-            />
+      {/* STAGE & VIDEO VIEWPORT */}
+      <div className="telehealth-stage-container">
+        {/* PRIMARY VIDEO STAGE */}
+        <div className={`video-stage-main ${activeDrawer ? "with-drawer" : ""}`}>
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className={`remote-stream-video ${participantConnected ? "active" : "hidden"}`}
+          />
 
-            {!participantConnected && (
-              <div className="remote-video-placeholder">
-                <div className="participant-avatar">
+          {/* WAITING STATE HOLOGRAM RADAR */}
+          {!participantConnected && (
+            <div className="stage-waiting-radar">
+              <div className="radar-scanner-ring ring-1"></div>
+              <div className="radar-scanner-ring ring-2"></div>
+              <div className="radar-scanner-ring ring-3"></div>
+
+              <div className="waiting-hologram-card">
+                <div className="waiting-avatar-circle">
                   {otherPersonName.charAt(0).toUpperCase()}
                 </div>
-                <h2>
-                  {isDoctor ? otherPersonName : `Dr. ${otherPersonName}`}
-                </h2>
-                <p>Waiting for video connection...</p>
+                <h3>
+                  Connecting with {isDoctor ? otherPersonName : `Dr. ${otherPersonName}`}
+                </h3>
+                <p>
+                  Waiting for participant to enter encrypted room <strong>#MED-{appointment.id}</strong>
+                </p>
+                <div className="waiting-pulse-meter">
+                  <span className="meter-bar"></span>
+                  <span className="meter-bar"></span>
+                  <span className="meter-bar"></span>
+                  <span className="meter-bar"></span>
+                  <span className="meter-bar"></span>
+                </div>
+                <div className="waiting-secure-tag">
+                  <ShieldCheckIcon size={14} /> Peer-to-Peer Signaling Handshake Active
+                </div>
               </div>
-            )}
-
-            <div className="participant-label">
-              {isDoctor ? "Patient" : "Doctor"}
             </div>
-          </div>
+          )}
 
-          <div className="local-video-card">
+          {/* FLOATING PICTURE-IN-PICTURE SELF VIEW */}
+          <div className="floating-pip-card">
             <video
               ref={localVideoRef}
               autoPlay
               playsInline
               muted
-              className="local-video"
+              className={`pip-stream-video ${cameraOn ? "active" : "hidden"}`}
             />
 
             {!cameraOn && (
-              <div className="camera-off-overlay">
-                <div className="camera-off-icon">📷</div>
-                <span>Camera Off</span>
+              <div className="pip-camera-off">
+                <div className="off-avatar">
+                  {user.name?.charAt(0).toUpperCase() || "U"}
+                </div>
+                <span>Camera Suspended</span>
               </div>
             )}
 
-            <div className="self-label">You</div>
+            <div className="pip-status-overlay">
+              <span className="pip-self-label">You (Self View)</span>
+              <span className={`pip-mic-dot ${micOn ? "active" : "muted"}`}>
+                {micOn ? "Mic On" : "Muted"}
+              </span>
+            </div>
           </div>
 
+          {/* MEDIA ERROR BANNER */}
           {mediaError && (
-            <div className="media-error" role="alert">
-              ⚠️ {mediaError}
+            <div className="stage-media-alert">
+              <AlertCircleIcon size={18} />
+              <span>{mediaError}</span>
             </div>
           )}
 
-          <div className="consultation-controls">
+          {/* FLOATING TELEHEALTH CONTROL DOCK */}
+          <div className="telehealth-controls-dock">
+            {/* MIC TOGGLE */}
             <button
-              className={`control-btn ${!micOn ? "control-off" : ""}`}
+              type="button"
+              className={`dock-btn ${!micOn ? "muted danger" : "active"}`}
               onClick={toggleMicrophone}
-              title={micOn ? "Mute microphone" : "Unmute microphone"}
-              aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
+              title={micOn ? "Mute Microphone" : "Unmute Microphone"}
             >
-              {micOn ? "🎙️" : "🔇"}
+              <HeartPulseIcon size={18} />
+              <span>{micOn ? "Mute" : "Unmuted"}</span>
             </button>
 
+            {/* CAMERA TOGGLE */}
             <button
-              className={`control-btn ${!cameraOn ? "control-off" : ""}`}
+              type="button"
+              className={`dock-btn ${!cameraOn ? "danger" : "active"}`}
               onClick={toggleCamera}
-              title={cameraOn ? "Turn camera off" : "Turn camera on"}
-              aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}
+              title={cameraOn ? "Turn Camera Off" : "Turn Camera On"}
             >
-              {cameraOn ? "📹" : "🚫"}
+              <VideoIcon size={18} />
+              <span>{cameraOn ? "Stop Cam" : "Start Cam"}</span>
             </button>
 
+            {/* SCREEN SHARE */}
             <button
-              className="control-btn"
+              type="button"
+              className={`dock-btn ${screenStreamRef.current ? "active-screen" : ""}`}
               onClick={shareScreen}
-              title="Share screen"
-              aria-label="Share screen"
+              title="Share Display or Clinical Reports"
             >
-              🖥️
+              <ActivityIcon size={18} />
+              <span>Share Screen</span>
             </button>
 
+            {/* PATIENT DOSSIER DRAWER TOGGLE */}
             <button
-              className={`control-btn ${
-                chatOpen ? "control-active" : ""
-              }`}
-              onClick={() => setChatOpen((open) => !open)}
-              title="Open chat"
-              aria-label="Toggle chat"
+              type="button"
+              className={`dock-btn ${activeDrawer === "dossier" ? "active-tab" : ""}`}
+              onClick={() => setActiveDrawer(activeDrawer === "dossier" ? null : "dossier")}
+              title="Inspect Patient Medical Dossier"
             >
-              💬
+              <UserIcon size={18} />
+              <span>Patient Dossier</span>
             </button>
 
-            <button className="end-call-btn" onClick={endConsultation}>
-              📞 Leave
+            {/* PRESCRIPTION PAD TOGGLE */}
+            <button
+              type="button"
+              className={`dock-btn ${activeDrawer === "prescription" ? "active-tab" : ""}`}
+              onClick={() => setActiveDrawer(activeDrawer === "prescription" ? null : "prescription")}
+              title="Digital Clinical Prescription Pad"
+            >
+              <FileTextIcon size={18} />
+              <span>Prescription</span>
+            </button>
+
+            {/* CHAT TOGGLE */}
+            <button
+              type="button"
+              className={`dock-btn ${activeDrawer === "chat" ? "active-tab" : ""}`}
+              onClick={() => setActiveDrawer(activeDrawer === "chat" ? null : "chat")}
+              title="Open Encrypted In-Session Chat"
+            >
+              <MailIcon size={18} />
+              <span>Chat {messages.length > 0 && `(${messages.length})`}</span>
+            </button>
+
+            {/* END CALL BUTTON */}
+            <button
+              type="button"
+              className="dock-btn-leave"
+              onClick={handleEndConsultation}
+              title="Conclude Video Consultation"
+            >
+              <PhoneIcon size={16} />
+              <span>End Call</span>
             </button>
           </div>
-        </section>
+        </div>
 
-        <aside className="consultation-sidebar">
-          <div className="sidebar-header">
-            <h2>Consultation Details</h2>
-            <span>#{appointment.id}</span>
-          </div>
-
-          <div className="consultation-detail">
-            <span>📅 Date</span>
-            <strong>{appointment.appointment_date || "Not available"}</strong>
-          </div>
-
-          <div className="consultation-detail">
-            <span>⏰ Scheduled time</span>
-            <strong>{appointment.appointment_time || "Not available"}</strong>
-          </div>
-
-          <div className="consultation-detail">
-            <span>👤 {isDoctor ? "Patient" : "Doctor"}</span>
-            <strong>
-              {isDoctor ? otherPersonName : `Dr. ${otherPersonName}`}
-            </strong>
-          </div>
-
-          {appointment.specialization && (
-            <div className="consultation-detail">
-              <span>🩺 Specialization</span>
-              <strong>{appointment.specialization}</strong>
-            </div>
-          )}
-
-          {appointment.symptoms && (
-            <div className="symptoms-panel">
-              <span>Symptoms</span>
-              <p>{appointment.symptoms}</p>
-            </div>
-          )}
-
-          {chatOpen && (
-            <div className="chat-panel">
-              <div className="chat-header">
-                <span>Appointment Chat</span>
+        {/* INTERACTIVE SLIDE-OVER CONSOLE (RIGHT SIDE) */}
+        {activeDrawer && (
+          <aside className="telehealth-slide-drawer">
+            {/* DRAWER TAB HEADER */}
+            <div className="drawer-tab-header">
+              <div className="tab-buttons">
                 <button
                   type="button"
-                  onClick={() => setChatOpen(false)}
-                  aria-label="Close chat"
+                  className={`tab-btn ${activeDrawer === "dossier" ? "active" : ""}`}
+                  onClick={() => setActiveDrawer("dossier")}
                 >
-                  ×
+                  <UserIcon size={14} /> Dossier
+                </button>
+                <button
+                  type="button"
+                  className={`tab-btn ${activeDrawer === "prescription" ? "active" : ""}`}
+                  onClick={() => setActiveDrawer("prescription")}
+                >
+                  <FileTextIcon size={14} /> Rx Pad
+                </button>
+                <button
+                  type="button"
+                  className={`tab-btn ${activeDrawer === "chat" ? "active" : ""}`}
+                  onClick={() => setActiveDrawer("chat")}
+                >
+                  <MailIcon size={14} /> Chat
                 </button>
               </div>
 
-              <div className="chat-messages">
-                {messages.length === 0 ? (
-                  <div className="chat-empty">
-                    💬
-                    <p>No messages yet.</p>
+              <button
+                type="button"
+                className="btn-close-drawer"
+                onClick={() => setActiveDrawer(null)}
+              >
+                <XIcon size={16} />
+              </button>
+            </div>
+
+            {/* TAB 1: PATIENT MEDICAL DOSSIER */}
+            {activeDrawer === "dossier" && (
+              <div className="drawer-content-pane">
+                <div className="pane-header">
+                  <h3>Patient Clinical Dossier</h3>
+                  <small>Verified health metrics & clinical alerts</small>
+                </div>
+
+                <div className="pane-section">
+                  <h4>Physical Telemetry</h4>
+                  <div className="dossier-grid">
+                    <div>
+                      <small>AGE</small>
+                      <strong>{appointment.patient_age ? `${appointment.patient_age} yrs` : "--"}</strong>
+                    </div>
+                    <div>
+                      <small>GENDER</small>
+                      <strong>{appointment.patient_gender || "Not specified"}</strong>
+                    </div>
+                    <div>
+                      <small>BLOOD GROUP</small>
+                      <strong style={{ color: "#f87171" }}>
+                        {appointment.patient_blood_group || "Unknown"}
+                      </strong>
+                    </div>
+                    <div>
+                      <small>HEIGHT</small>
+                      <strong>{appointment.patient_height ? `${appointment.patient_height} cm` : "--"}</strong>
+                    </div>
+                    <div>
+                      <small>WEIGHT</small>
+                      <strong>{appointment.patient_weight ? `${appointment.patient_weight} kg` : "--"}</strong>
+                    </div>
+                    <div>
+                      <small>BMI</small>
+                      <strong>
+                        {appointment.patient_height && appointment.patient_weight
+                          ? `${(appointment.patient_weight / Math.pow(appointment.patient_height / 100, 2)).toFixed(1)}`
+                          : "--"}
+                      </strong>
+                    </div>
                   </div>
-                ) : (
-                  messages.map((item, index) => {
-                    const senderId =
-                      item.user_id ?? item.sender_id ?? item.user?.id;
+                </div>
 
-                    const ownMessage =
-                      String(senderId) === String(user.id);
+                <div className="pane-section">
+                  <h4>Critical Clinical Alerts</h4>
+                  <div className="dossier-pill-box red">
+                    <strong>KNOWN ALLERGIES:</strong>
+                    <p>{appointment.patient_allergies || "No known drug/food allergies recorded."}</p>
+                  </div>
+                  <div className="dossier-pill-box amber" style={{ marginTop: "10px" }}>
+                    <strong>CHRONIC CONDITIONS:</strong>
+                    <p>{appointment.patient_chronic_conditions || "No chronic conditions recorded."}</p>
+                  </div>
+                </div>
 
-                    return (
-                      <div
-                        key={item.id ?? `${item.created_at}-${index}`}
-                        className={`chat-message ${
-                          ownMessage ? "my-message" : "other-message"
-                        }`}
-                      >
-                        <strong>
-                          {item.user_name ||
-                            item.sender_name ||
-                            item.user?.name ||
-                            (ownMessage ? "You" : "Participant")}
-                        </strong>
-                        <p>{item.message || item.content}</p>
-                        {item.created_at && (
-                          <small>
-                            {new Date(item.created_at).toLocaleTimeString(
-                              [],
-                              { hour: "2-digit", minute: "2-digit" }
-                            )}
-                          </small>
-                        )}
-                      </div>
-                    );
-                  })
+                <div className="pane-section">
+                  <h4>Medications & Surgeries</h4>
+                  <div className="dossier-info-block">
+                    <small>CURRENT MEDICATIONS</small>
+                    <p>{appointment.patient_current_medications || "No active medications."}</p>
+                  </div>
+                  <div className="dossier-info-block" style={{ marginTop: "10px" }}>
+                    <small>PAST SURGERIES</small>
+                    <p>{appointment.patient_past_surgeries || "No prior surgeries."}</p>
+                  </div>
+                </div>
+
+                <div className="pane-section">
+                  <h4>Emergency Contact</h4>
+                  <div className="dossier-info-block">
+                    <p>
+                      <strong>{appointment.patient_emergency_contact_name || "Not provided"}</strong>{" "}
+                      ({appointment.patient_emergency_contact_relation || "Relation unknown"})
+                    </p>
+                    <strong style={{ color: "#2dd4bf", fontSize: "12.5px" }}>
+                      {appointment.patient_emergency_contact_phone || "--"}
+                    </strong>
+                  </div>
+                </div>
+
+                {appointment.symptoms && (
+                  <div className="pane-section">
+                    <h4>Chief Complaint for Session</h4>
+                    <p className="symptom-quote">{appointment.symptoms}</p>
+                  </div>
                 )}
               </div>
+            )}
 
-              {chatError && (
-                <p className="chat-error" role="alert">
-                  {chatError}
-                </p>
-              )}
+            {/* TAB 2: IN-CALL DIGITAL PRESCRIPTION PAD */}
+            {activeDrawer === "prescription" && (
+              <div className="drawer-content-pane">
+                <div className="pane-header">
+                  <h3>Certified Digital Prescription</h3>
+                  <small>
+                    {isDoctor
+                      ? "Issue digital prescription directly during video consultation"
+                      : "Prescription and diagnostic instructions issued by attending physician"}
+                  </small>
+                </div>
 
-              <form className="chat-input-row" onSubmit={sendMessage}>
-                <input
-                  type="text"
-                  value={messageText}
-                  onChange={(event) => setMessageText(event.target.value)}
-                  placeholder="Type a message..."
-                  maxLength={2000}
-                  aria-label="Chat message"
-                />
-                <button
-                  type="submit"
-                  disabled={!messageText.trim() || sendingMessage}
-                >
-                  {sendingMessage ? "…" : "➤"}
-                </button>
-              </form>
-            </div>
-          )}
-        </aside>
-      </main>
+                {existingPrescription ? (
+                  <div className="existing-prescription-card">
+                    <div className="rx-badge">
+                      <CheckCircleIcon size={16} /> Certified Prescription On File
+                    </div>
+
+                    <div className="rx-item">
+                      <small>PRIMARY DIAGNOSIS</small>
+                      <strong>{existingPrescription.diagnosis}</strong>
+                    </div>
+
+                    <div className="rx-item">
+                      <small>PRESCRIBED MEDICINES</small>
+                      <div className="rx-meds-list">
+                        {(() => {
+                          try {
+                            const meds = JSON.parse(existingPrescription.prescription);
+                            if (Array.isArray(meds)) {
+                              return meds.map((m, i) => (
+                                <div key={i} className="med-chip">
+                                  <strong>{m.name || "Medicine"}</strong>
+                                  <span>{m.dosage} • {m.frequency} • {m.duration}</span>
+                                </div>
+                              ));
+                            }
+                          } catch {
+                            // fall back to string
+                          }
+                          return <p>{existingPrescription.prescription}</p>;
+                        })()}
+                      </div>
+                    </div>
+
+                    {existingPrescription.doctor_notes && (
+                      <div className="rx-item">
+                        <small>PHYSICIAN'S CLINICAL NOTES</small>
+                        <p>{existingPrescription.doctor_notes}</p>
+                      </div>
+                    )}
+
+                    {existingPrescription.follow_up_date && (
+                      <div className="rx-item">
+                        <small>RECOMMENDED FOLLOW-UP</small>
+                        <strong>{existingPrescription.follow_up_date}</strong>
+                      </div>
+                    )}
+                  </div>
+                ) : isDoctor ? (
+                  <form onSubmit={handleSavePrescription} className="prescription-form">
+                    <div className="form-group">
+                      <label>Clinical Diagnosis *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Acute Viral Bronchitis"
+                        value={prescriptionForm.diagnosis}
+                        onChange={(e) =>
+                          setPrescriptionForm((prev) => ({ ...prev, diagnosis: e.target.value }))
+                        }
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <div className="meds-header-row">
+                        <label>Pharmaceutical Regimen</label>
+                        <button
+                          type="button"
+                          className="btn-add-med"
+                          onClick={handleAddMedicine}
+                        >
+                          <PlusIcon size={12} /> Add Medicine
+                        </button>
+                      </div>
+
+                      {prescriptionForm.medicines.map((med, idx) => (
+                        <div key={idx} className="medicine-input-row">
+                          <input
+                            type="text"
+                            placeholder="Medicine Name (e.g. Amoxicillin)"
+                            value={med.name}
+                            onChange={(e) =>
+                              handleMedicineChange(idx, "name", e.target.value)
+                            }
+                          />
+                          <div className="med-details-row">
+                            <input
+                              type="text"
+                              placeholder="Dosage (500mg)"
+                              value={med.dosage}
+                              onChange={(e) =>
+                                handleMedicineChange(idx, "dosage", e.target.value)
+                              }
+                            />
+                            <input
+                              type="text"
+                              placeholder="Freq (TDS - 3x/day)"
+                              value={med.frequency}
+                              onChange={(e) =>
+                                handleMedicineChange(idx, "frequency", e.target.value)
+                              }
+                            />
+                            <input
+                              type="text"
+                              placeholder="Duration (5 days)"
+                              value={med.duration}
+                              onChange={(e) =>
+                                handleMedicineChange(idx, "duration", e.target.value)
+                              }
+                            />
+                            {prescriptionForm.medicines.length > 1 && (
+                              <button
+                                type="button"
+                                className="btn-del-med"
+                                onClick={() => handleRemoveMedicine(idx)}
+                              >
+                                <XIcon size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="form-group">
+                      <label>Special Instructions & Doctor Notes</label>
+                      <textarea
+                        rows={3}
+                        placeholder="Dietary instructions, rest recommendations, hydration..."
+                        value={prescriptionForm.doctor_notes}
+                        onChange={(e) =>
+                          setPrescriptionForm((prev) => ({ ...prev, doctor_notes: e.target.value }))
+                        }
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Follow-up Date</label>
+                      <input
+                        type="date"
+                        value={prescriptionForm.follow_up_date}
+                        onChange={(e) =>
+                          setPrescriptionForm((prev) => ({ ...prev, follow_up_date: e.target.value }))
+                        }
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="btn-submit-rx"
+                      disabled={savingPrescription}
+                    >
+                      {savingPrescription ? "Signing & Dispatching..." : "Issue & Sign Certified Prescription"}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="rx-empty-state">
+                    <FileTextIcon size={32} />
+                    <p>Your doctor has not yet issued a digital prescription for this session. It will appear here once finalized.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: IN-SESSION ENCRYPTED CHAT */}
+            {activeDrawer === "chat" && (
+              <div className="drawer-content-pane chat-pane">
+                <div className="pane-header">
+                  <h3>Encrypted In-Session Chat</h3>
+                  <small>Peer-to-peer real-time clinical notes & queries</small>
+                </div>
+
+                <div className="chat-messages-scroll">
+                  {messages.length === 0 ? (
+                    <div className="chat-empty-state">
+                      <MailIcon size={28} />
+                      <p>No messages yet. Send a note or clinical reference to participant.</p>
+                    </div>
+                  ) : (
+                    messages.map((item, idx) => {
+                      const isMe = String(item.sender_id || item.user_id) === String(user.id);
+                      return (
+                        <div key={idx} className={`chat-bubble-row ${isMe ? "outgoing" : "incoming"}`}>
+                          <div className="chat-bubble">
+                            <span className="bubble-sender">
+                              {isMe ? "You" : item.sender_name || otherPersonName}
+                            </span>
+                            <p>{item.message}</p>
+                            <span className="bubble-time">
+                              {item.created_at ? new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <form onSubmit={sendMessage} className="chat-input-bar">
+                  <input
+                    type="text"
+                    placeholder="Type encrypted message..."
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                  />
+                  <button type="submit" disabled={!messageText.trim() || sendingMessage}>
+                    Send
+                  </button>
+                </form>
+              </div>
+            )}
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

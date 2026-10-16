@@ -2,6 +2,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./PatientMedicalRecords.css";
+import {
+  CalendarIcon,
+  FileTextIcon,
+  HospitalIcon,
+  PillIcon,
+  PrinterIcon,
+} from "../components/Icons";
 
 function parsePrescription(value) {
   if (!value || typeof value !== "string") {
@@ -289,7 +296,9 @@ function PatientMedicalRecords() {
 
         {!loading && !error && records.length === 0 && (
           <div className="empty-medical-records">
-            <div className="medical-empty-icon">📋</div>
+            <div className="medical-empty-icon">
+              <FileTextIcon size={36} />
+            </div>
             <h2>No Medical Records Yet</h2>
             <p>
               Your consultation records will appear here after a doctor
@@ -323,7 +332,9 @@ function PatientMedicalRecords() {
                       </p>
 
                       {record.hospital && (
-                        <span>🏥 {record.hospital}</span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                          <HospitalIcon size={13} /> {record.hospital}
+                        </span>
                       )}
                     </div>
 
@@ -344,7 +355,9 @@ function PatientMedicalRecords() {
                     </div>
 
                     <div className="record-section prescription-record-section">
-                      <h3>💊 Prescription</h3>
+                      <h3 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <PillIcon size={18} /> Prescription
+                      </h3>
 
                       {medicines.length > 0 ? (
                         <div className="prescription-table-wrapper">
@@ -389,7 +402,9 @@ function PatientMedicalRecords() {
 
                     {record.follow_up_date && (
                       <div className="follow-up-section">
-                        <strong>📅 Follow-up Date</strong>
+                        <strong style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                          <CalendarIcon size={14} /> Follow-up Date
+                        </strong>
                         <span>{record.follow_up_date}</span>
                       </div>
                     )}
@@ -399,7 +414,8 @@ function PatientMedicalRecords() {
                       className="print-prescription-btn"
                       onClick={() => printPrescription(record)}
                     >
-                      🖨️ Print / Save as PDF
+                      <PrinterIcon size={16} />
+                      <span>Print / Save as PDF</span>
                     </button>
                   </div>
                 </article>

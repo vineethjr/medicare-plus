@@ -2,6 +2,11 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./DoctorConsultation.css";
+import {
+  CalendarIcon,
+  ClockIcon,
+  PillIcon,
+} from "../components/Icons";
 
 const createMedicine = () => ({
   id: `${Date.now()}-${Math.random()}`,
@@ -179,8 +184,12 @@ function DoctorConsultation() {
             <p>{appointment.patient_email || ""}</p>
 
             <div className="appointment-info">
-              <span>📅 {appointment.appointment_date}</span>
-              <span>🕐 {appointment.appointment_time}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <CalendarIcon size={14} /> {appointment.appointment_date}
+              </span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <ClockIcon size={14} /> {appointment.appointment_time}
+              </span>
             </div>
           </div>
         </section>
@@ -204,7 +213,9 @@ function DoctorConsultation() {
             <div className="prescription-builder">
               <div className="prescription-builder-header">
                 <div>
-                  <h3>💊 Prescription</h3>
+                  <h3 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <PillIcon size={18} /> Prescription
+                  </h3>
                   <p>
                     Add the medicines prescribed for this patient.
                   </p>

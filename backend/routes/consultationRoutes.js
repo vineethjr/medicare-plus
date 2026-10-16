@@ -45,11 +45,20 @@ router.post("/", protect, (req, res) => {
       });
     }
 
-    if (appointment.status !== "Completed") {
+    if (!["Confirmed", "Completed"].includes(appointment.status)) {
       return res.status(400).json({
         message:
-          "Consultation records can only be created for completed appointments.",
+          "Consultation records can only be created for confirmed or completed appointments.",
       });
+    }
+
+    if (appointment.status === "Confirmed") {
+      db.prepare(`
+        UPDATE appointments
+        SET status = 'Completed',
+            consultation_ended_at = COALESCE(consultation_ended_at, datetime('now'))
+        WHERE id = ?
+      `).run(appointment.id);
     }
 
     const existingRecord = db

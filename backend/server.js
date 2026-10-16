@@ -30,12 +30,14 @@ const doctorRoutes = require("./routes/doctorRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
 const recommendationRoutes = require("./routes/recommendationRoutes");
 const consultationRoutes = require("./routes/consultationRoutes");
+const patientRoutes = require("./routes/patientRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/consultations", consultationRoutes);
+app.use("/api/patient", patientRoutes);
 
 // ========================================
 // ROOT ROUTE

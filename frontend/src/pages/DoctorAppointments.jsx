@@ -1,7 +1,19 @@
-
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./DoctorAppointments.css";
+import {
+  CalendarIcon,
+  ClockIcon,
+  CreditCardIcon,
+  VideoIcon,
+  HospitalIcon,
+  FileTextIcon,
+  CheckCircleIcon,
+  XIcon,
+  MailIcon,
+  ArrowRightIcon,
+  AlertCircleIcon,
+} from "../components/Icons";
 
 const API_URL = "http://localhost:5000/api";
 
@@ -17,6 +29,7 @@ function DoctorAppointments() {
   }
 
   const [appointments, setAppointments] = useState([]);
+  const [filter, setFilter] = useState("all"); // 'all', 'pending', 'confirmed', 'completed', 'paid', 'unpaid'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState(null);
@@ -39,21 +52,16 @@ function DoctorAppointments() {
 
         if (showLoading) setLoading(true);
 
-        const response = await fetch(
-          `${API_URL}/appointments/doctor`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const response = await fetch(`${API_URL}/appointments/doctor`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(
-            data.message || "Failed to load appointments."
-          );
+          throw new Error(data.message || "Failed to load appointments.");
         }
 
         setAppointments(Array.isArray(data) ? data : []);
@@ -97,9 +105,7 @@ function DoctorAppointments() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to update appointment."
-        );
+        throw new Error(data.message || "Failed to update appointment.");
       }
 
       await fetchAppointments(false);
@@ -116,9 +122,7 @@ function DoctorAppointments() {
       setError("");
 
       if (appointment.status !== "Confirmed") {
-        throw new Error(
-          "Only confirmed appointments can be started."
-        );
+        throw new Error("Only confirmed appointments can be started.");
       }
 
       if (appointment.consultation_mode !== "Online") {
@@ -126,9 +130,7 @@ function DoctorAppointments() {
       }
 
       if (!appointment.meeting_link) {
-        throw new Error(
-          "The online consultation room is unavailable."
-        );
+        throw new Error("The online consultation room is unavailable.");
       }
 
       const response = await fetch(
@@ -144,9 +146,7 @@ function DoctorAppointments() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.message || "Could not start consultation."
-        );
+        throw new Error(data.message || "Could not start consultation.");
       }
 
       await fetchAppointments(false);
@@ -155,8 +155,7 @@ function DoctorAppointments() {
         state: {
           appointment: {
             ...appointment,
-            consultation_started_at:
-              data.consultation_started_at,
+            consultation_started_at: data.consultation_started_at,
           },
         },
       });
@@ -210,15 +209,12 @@ function DoctorAppointments() {
     if (!chatAppointment) return;
 
     fetchMessages();
-
     const timer = setInterval(fetchMessages, 3000);
-
     return () => clearInterval(timer);
   }, [chatAppointment, fetchMessages]);
 
   async function sendMessage(event) {
     event.preventDefault();
-
     const message = chatMessage.trim();
 
     if (!message || !chatAppointment || sendingMessage) return;
@@ -242,16 +238,13 @@ function DoctorAppointments() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to send message."
-        );
+        throw new Error(data.message || "Failed to send message.");
       }
 
       setMessages((previous) => {
         if (previous.some((item) => item.id === data.id)) {
           return previous;
         }
-
         return [...previous, data];
       });
 
@@ -265,7 +258,7 @@ function DoctorAppointments() {
 
   async function cancelAppointment(appointment) {
     const confirmed = window.confirm(
-      "Are you sure you want to cancel this appointment?"
+      `Cancel the appointment with patient ${appointment.patient_name || "Patient"}?`
     );
 
     if (!confirmed) return;
@@ -287,9 +280,7 @@ function DoctorAppointments() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to cancel appointment."
-        );
+        throw new Error(data.message || "Failed to cancel appointment.");
       }
 
       await fetchAppointments(false);
@@ -302,7 +293,7 @@ function DoctorAppointments() {
 
   async function removeFromHistory(appointment) {
     const confirmed = window.confirm(
-      "Remove this appointment from your history? This will not delete the patient's medical records."
+      "Remove this appointment from your workspace history? Patient clinical records will be safely retained."
     );
 
     if (!confirmed) return;
@@ -324,9 +315,7 @@ function DoctorAppointments() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to remove appointment history."
-        );
+        throw new Error(data.message || "Failed to remove appointment history.");
       }
 
       setAppointments((previous) =>
@@ -350,27 +339,33 @@ function DoctorAppointments() {
   }
 
   function formatDateTime(value) {
-    if (!value) return "Not started";
-
+    if (!value) return "Not recorded";
     const date = new Date(value);
-
     if (Number.isNaN(date.getTime())) return value;
-
     return date.toLocaleString();
   }
 
-  function getStatusClass(status) {
-    return (status || "pending")
-      .toLowerCase()
-      .replace(/\s+/g, "-");
-  }
+  // Filtered Appointments
+  const filteredAppointments = appointments.filter((appointment) => {
+    if (filter === "pending") return appointment.status === "Pending";
+    if (filter === "confirmed") return appointment.status === "Confirmed";
+    if (filter === "completed") return appointment.status === "Completed";
+    if (filter === "paid") return appointment.payment_status === "Paid";
+    if (filter === "unpaid") {
+      return (
+        appointment.status === "Confirmed" &&
+        appointment.payment_status !== "Paid"
+      );
+    }
+    return true;
+  });
 
   return (
     <div className="doctor-appointments-page">
       <header className="appointments-header">
         <div>
-          <h1>Appointment Requests</h1>
-          <p>Manage patient appointments and consultations.</p>
+          <h1>Appointment Requests & Consultations</h1>
+          <p>Review incoming requests, manage clinical slots, and monitor payment settlements.</p>
         </div>
 
         <button
@@ -378,271 +373,335 @@ function DoctorAppointments() {
           className="back-dashboard-btn"
           onClick={() => navigate("/doctor-dashboard")}
         >
-          Back to Dashboard
+          ← Clinical Dashboard
         </button>
       </header>
 
+      {/* FILTER BAR */}
+      <div className="appointments-filter-bar">
+        <button
+          className={`filter-tab-btn ${filter === "all" ? "active" : ""}`}
+          onClick={() => setFilter("all")}
+        >
+          All Bookings <span className="filter-count">{appointments.length}</span>
+        </button>
+
+        <button
+          className={`filter-tab-btn ${filter === "pending" ? "active" : ""}`}
+          onClick={() => setFilter("pending")}
+        >
+          Pending Requests{" "}
+          <span className="filter-count">
+            {appointments.filter((a) => a.status === "Pending").length}
+          </span>
+        </button>
+
+        <button
+          className={`filter-tab-btn ${filter === "confirmed" ? "active" : ""}`}
+          onClick={() => setFilter("confirmed")}
+        >
+          Confirmed{" "}
+          <span className="filter-count">
+            {appointments.filter((a) => a.status === "Confirmed").length}
+          </span>
+        </button>
+
+        <button
+          className={`filter-tab-btn ${filter === "unpaid" ? "active" : ""}`}
+          onClick={() => setFilter("unpaid")}
+        >
+          Payment Pending{" "}
+          <span className="filter-count">
+            {
+              appointments.filter(
+                (a) => a.status === "Confirmed" && a.payment_status !== "Paid"
+              ).length
+            }
+          </span>
+        </button>
+
+        <button
+          className={`filter-tab-btn ${filter === "paid" ? "active" : ""}`}
+          onClick={() => setFilter("paid")}
+        >
+          Fee Paid{" "}
+          <span className="filter-count">
+            {appointments.filter((a) => a.payment_status === "Paid").length}
+          </span>
+        </button>
+
+        <button
+          className={`filter-tab-btn ${filter === "completed" ? "active" : ""}`}
+          onClick={() => setFilter("completed")}
+        >
+          Completed{" "}
+          <span className="filter-count">
+            {appointments.filter((a) => a.status === "Completed").length}
+          </span>
+        </button>
+      </div>
+
       {error && (
         <div className="appointments-error" role="alert">
-          {error}
+          ⚠️ {error}
         </div>
       )}
 
       {loading && (
-        <p className="appointments-status">
-          Loading appointment requests...
-        </p>
+        <p className="appointments-status">Loading clinical appointments...</p>
       )}
 
-      {!loading && appointments.length === 0 && !error && (
+      {!loading && filteredAppointments.length === 0 && !error && (
         <div className="empty-appointments">
-          <div className="empty-icon">📅</div>
-          <h2>No appointment requests yet</h2>
-          <p>Patient appointment requests will appear here.</p>
+          <div className="empty-icon">
+            <CalendarIcon size={36} />
+          </div>
+          <h2>No matching appointments</h2>
+          <p>There are no appointments under this filter.</p>
         </div>
       )}
 
       <section className="appointments-list">
-        {appointments.map((appointment) => (
-          <article
-            className="appointment-card"
-            key={appointment.id}
-          >
-            <div className="appointment-card-header">
-              <div className="patient-avatar">
-                {appointment.patient_name?.charAt(0).toUpperCase() ||
-                  "P"}
-              </div>
+        {filteredAppointments.map((appointment) => {
+          const isPaid = appointment.payment_status === "Paid";
+          const amount = appointment.payment_amount || 0;
 
-              <div className="patient-info">
-                <h2>{appointment.patient_name || "Patient"}</h2>
-                <p>{appointment.patient_email || ""}</p>
-              </div>
-
-              <span
-                className={`appointment-status ${getStatusClass(
-                  appointment.status
-                )}`}
-              >
-                {appointment.status}
-              </span>
-            </div>
-
-            <div className="appointment-details">
-              <div>
-                <span>Scheduled date</span>
-                <strong>{appointment.appointment_date}</strong>
-              </div>
-
-              <div>
-                <span>Scheduled time</span>
-                <strong>{appointment.appointment_time}</strong>
-              </div>
-
-              <div>
-                <span>Consultation mode</span>
-                <strong
-                  className={
-                    appointment.consultation_mode === "Online"
-                      ? "doctor-online-mode"
-                      : "doctor-offline-mode"
-                  }
-                >
-                  {appointment.consultation_mode || "Offline"}
-                </strong>
-              </div>
-            </div>
-
-            {appointment.consultation_started_at && (
-              <p className="consultation-timestamp">
-                <strong>Actual start:</strong>{" "}
-                {formatDateTime(
-                  appointment.consultation_started_at
-                )}
-              </p>
-            )}
-
-            {appointment.consultation_ended_at && (
-              <p className="consultation-timestamp">
-                <strong>Actual end:</strong>{" "}
-                {formatDateTime(
-                  appointment.consultation_ended_at
-                )}
-              </p>
-            )}
-
-            {appointment.consultation_mode === "Online" ? (
-              <div className="doctor-online-box">
-                <div className="doctor-online-info">
-                  <div className="doctor-online-icon">💻</div>
-                  <div>
-                    <strong>Online Consultation</strong>
-                    <p>
-                      Start the consultation to open the online
-                      consultation room.
-                    </p>
-                  </div>
+          return (
+            <article className="appointment-card" key={appointment.id}>
+              <div className="appointment-card-header">
+                <div className="patient-avatar">
+                  {appointment.patient_name?.charAt(0).toUpperCase() || "P"}
                 </div>
 
-                {appointment.status === "Confirmed" && (
-                  <button
-                    type="button"
-                    className="start-consultation-btn"
-                    disabled={updatingId === appointment.id}
-                    onClick={() =>
-                      startOnlineConsultation(appointment)
-                    }
+                <div className="patient-info">
+                  <h2>{appointment.patient_name || "Patient"}</h2>
+                  <p>{appointment.patient_email || "Patient email unavailable"}</p>
+                </div>
+
+                <div className="appointment-header-badges">
+                  {/* PAYMENT BADGE */}
+                  {isPaid ? (
+                    <span className="doctor-payment-pill paid">
+                      <CreditCardIcon size={14} /> Fee Paid · ₹{amount}
+                    </span>
+                  ) : appointment.status === "Confirmed" ? (
+                    <span className="doctor-payment-pill unpaid">
+                      <ClockIcon size={14} /> Fee Pending · ₹{amount || "Fee set"}
+                    </span>
+                  ) : null}
+
+                  {/* STATUS BADGE */}
+                  <span
+                    className={`appointment-status ${appointment.status.toLowerCase()}`}
                   >
-                    {updatingId === appointment.id
-                      ? "Opening..."
-                      : "🎥 Start Consultation"}
-                  </button>
+                    {appointment.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="appointment-details">
+                <div>
+                  <span>Scheduled Date</span>
+                  <strong style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <CalendarIcon size={14} /> {appointment.appointment_date}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Scheduled Time</span>
+                  <strong style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <ClockIcon size={14} /> {appointment.appointment_time}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Consultation Mode</span>
+                  <strong
+                    className={
+                      appointment.consultation_mode === "Online"
+                        ? "doctor-online-mode"
+                        : "doctor-offline-mode"
+                    }
+                    style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+                  >
+                    {appointment.consultation_mode === "Online" ? (
+                      <>
+                        <VideoIcon size={14} /> Online Telehealth
+                      </>
+                    ) : (
+                      <>
+                        <HospitalIcon size={14} /> In-Person Hospital Visit
+                      </>
+                    )}
+                  </strong>
+                </div>
+              </div>
+
+              {appointment.consultation_started_at && (
+                <div className="consultation-timestamp">
+                  <strong>Actual Start:</strong>{" "}
+                  {formatDateTime(appointment.consultation_started_at)}
+                </div>
+              )}
+
+              {appointment.consultation_ended_at && (
+                <div className="consultation-timestamp" style={{ marginLeft: "8px" }}>
+                  <strong>Actual End:</strong>{" "}
+                  {formatDateTime(appointment.consultation_ended_at)}
+                </div>
+              )}
+
+              {/* ONLINE OR OFFLINE CALLOUT */}
+              {appointment.consultation_mode === "Online" ? (
+                <div className="doctor-online-box">
+                  <div className="doctor-online-info">
+                    <div className="doctor-online-icon">
+                      <VideoIcon size={24} />
+                    </div>
+                    <div>
+                      <strong>Online WebRTC Telehealth Session</strong>
+                      <p>
+                        {isPaid
+                          ? "Patient has paid consultation fee. Video room is ready."
+                          : "Awaiting patient fee settlement. You can start when ready."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {appointment.status === "Confirmed" && (
+                    <button
+                      type="button"
+                      className="start-consultation-btn"
+                      disabled={updatingId === appointment.id}
+                      onClick={() => startOnlineConsultation(appointment)}
+                    >
+                      <VideoIcon size={16} />
+                      <span>
+                        {updatingId === appointment.id
+                          ? "Opening room..."
+                          : "Start Video Consultation"}
+                      </span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="doctor-offline-box">
+                  <div className="doctor-offline-icon">
+                    <HospitalIcon size={24} />
+                  </div>
+                  <div>
+                    <strong>Hospital Visit Consultation</strong>
+                    <p>The patient will arrive at your clinic at the scheduled time.</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="symptoms-section">
+                <h3>Reason for Visit / Patient Symptoms</h3>
+                <p>{appointment.symptoms || "No preliminary symptoms submitted."}</p>
+              </div>
+
+              {/* APPOINTMENT ACTIONS */}
+              <div className="appointment-actions">
+                {appointment.status === "Pending" && (
+                  <>
+                    <button
+                      type="button"
+                      className="confirm-btn"
+                      disabled={updatingId === appointment.id}
+                      onClick={() => updateStatus(appointment.id, "Confirmed")}
+                    >
+                      <CheckCircleIcon size={16} />
+                      <span>{updatingId === appointment.id ? "Updating..." : "Confirm Appointment"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="reject-btn"
+                      disabled={updatingId === appointment.id}
+                      onClick={() => updateStatus(appointment.id, "Rejected")}
+                    >
+                      <XIcon size={16} />
+                      <span>Decline</span>
+                    </button>
+                  </>
                 )}
 
-                {appointment.status === "Pending" && (
-                  <span className="doctor-waiting-text">
-                    ⏳ Waiting for confirmation
-                  </span>
+                {appointment.status === "Confirmed" && (
+                  <>
+                    <button
+                      type="button"
+                      className="consultation-btn"
+                      onClick={() => openChat(appointment)}
+                    >
+                      <MailIcon size={16} />
+                      <span>Message Patient</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="complete-btn"
+                      disabled={updatingId === appointment.id}
+                      onClick={() => updateStatus(appointment.id, "Completed")}
+                    >
+                      <CheckCircleIcon size={16} />
+                      <span>
+                        {updatingId === appointment.id
+                          ? "Completing..."
+                          : "Complete Consultation"}
+                      </span>
+                    </button>
+                  </>
                 )}
 
                 {appointment.status === "Completed" && (
-                  <span className="doctor-completed-text">
-                    ✓ Consultation completed
-                  </span>
+                  <>
+                    <button
+                      type="button"
+                      className="consultation-btn"
+                      onClick={() => openChat(appointment)}
+                    >
+                      <MailIcon size={16} />
+                      <span>View Chat Log</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="complete-btn"
+                      onClick={() => openConsultationForm(appointment)}
+                    >
+                      <FileTextIcon size={16} />
+                      <span>Issue Prescription & Records</span>
+                    </button>
+                  </>
                 )}
-              </div>
-            ) : (
-              <div className="doctor-offline-box">
-                <div className="doctor-offline-icon">🏥</div>
-                <div>
-                  <strong>Offline Consultation</strong>
-                  <p>
-                    Patient will visit the hospital for the
-                    consultation.
-                  </p>
-                </div>
-              </div>
-            )}
 
-            <div className="symptoms-section">
-              <h3>Symptoms / Reason</h3>
-              <p>
-                {appointment.symptoms || "No symptoms provided."}
-              </p>
-            </div>
-
-            <div className="appointment-actions">
-              {appointment.status === "Pending" && (
-                <>
-                  <button
-                    type="button"
-                    className="confirm-btn"
-                    disabled={updatingId === appointment.id}
-                    onClick={() =>
-                      updateStatus(appointment.id, "Confirmed")
-                    }
-                  >
-                    {updatingId === appointment.id
-                      ? "Updating..."
-                      : "Confirm"}
-                  </button>
-
+                {["Pending", "Confirmed"].includes(appointment.status) && (
                   <button
                     type="button"
                     className="reject-btn"
                     disabled={updatingId === appointment.id}
-                    onClick={() =>
-                      updateStatus(appointment.id, "Rejected")
-                    }
+                    onClick={() => cancelAppointment(appointment)}
                   >
-                    Reject
+                    Cancel Booking
                   </button>
-                </>
-              )}
+                )}
 
-              {appointment.status === "Confirmed" && (
-                <>
-                  <button
-                    type="button"
-                    className="consultation-btn"
-                    onClick={() => openChat(appointment)}
-                  >
-                    💬 Chat with Patient
-                  </button>
-
-                  <button
-                    type="button"
-                    className="complete-btn"
-                    disabled={updatingId === appointment.id}
-                    onClick={() =>
-                      updateStatus(appointment.id, "Completed")
-                    }
-                  >
-                    {updatingId === appointment.id
-                      ? "Updating..."
-                      : "Mark as Completed"}
-                  </button>
-                </>
-              )}
-
-              {appointment.status === "Completed" && (
-                <>
-                  <span className="completed-text">
-                    Consultation completed
-                  </span>
-
-                  <button
-                    type="button"
-                    className="consultation-btn"
-                    onClick={() => openChat(appointment)}
-                  >
-                    💬 View Chat
-                  </button>
-
-                  <button
-                    type="button"
-                    className="consultation-btn"
-                    onClick={() =>
-                      openConsultationForm(appointment)
-                    }
-                  >
-                    📝 Add Consultation
-                  </button>
-                </>
-              )}
-
-              {appointment.status === "Rejected" && (
-                <span className="rejected-text">
-                  Appointment rejected
-                </span>
-              )}
-
-              {["Pending", "Confirmed"].includes(
-                appointment.status
-              ) && (
                 <button
                   type="button"
-                  className="reject-btn"
+                  className="doctor-history-delete-btn"
                   disabled={updatingId === appointment.id}
-                  onClick={() => cancelAppointment(appointment)}
+                  onClick={() => removeFromHistory(appointment)}
                 >
-                  Cancel Appointment
+                  Remove from History
                 </button>
-              )}
-
-              <button
-                type="button"
-                className="consultation-btn"
-                disabled={updatingId === appointment.id}
-                onClick={() => removeFromHistory(appointment)}
-              >
-                Remove from History
-              </button>
-            </div>
-          </article>
-        ))}
+              </div>
+            </article>
+          );
+        })}
       </section>
 
+      {/* CHAT MODAL */}
       {chatAppointment && (
         <div
           className="appointment-chat-overlay"
@@ -660,12 +719,8 @@ function DoctorAppointments() {
           >
             <header className="appointment-chat-header">
               <div>
-                <h2>
-                  Chat with {chatAppointment.patient_name || "Patient"}
-                </h2>
-                <p>
-                  Appointment #{chatAppointment.id} · Messages are saved
-                </p>
+                <h2>Chat with {chatAppointment.patient_name || "Patient"}</h2>
+                <p>Appointment #{chatAppointment.id} · Encrypted clinical chat</p>
               </div>
 
               <button
@@ -677,19 +732,14 @@ function DoctorAppointments() {
               </button>
             </header>
 
-            {chatError && (
-              <p className="appointments-error">{chatError}</p>
-            )}
+            {chatError && <p className="appointments-error">{chatError}</p>}
 
             <div className="appointment-chat-messages">
-              {chatLoading && messages.length === 0 && (
-                <p>Loading messages...</p>
-              )}
+              {chatLoading && messages.length === 0 && <p>Loading messages...</p>}
 
               {!chatLoading && messages.length === 0 && (
                 <p className="appointment-chat-empty">
-                  No messages yet. Send a message to discuss the
-                  appointment or consultation arrangements.
+                  No messages yet. Send a message to discuss consultation arrangements.
                 </p>
               )}
 
@@ -705,29 +755,21 @@ function DoctorAppointments() {
                     }`}
                   >
                     <strong>
-                      {message.sender_name ||
-                        (ownMessage ? "You" : "Patient")}
+                      {message.sender_name || (ownMessage ? "You" : "Patient")}
                     </strong>
                     <p>{message.message}</p>
-                    <small>
-                      {formatDateTime(message.created_at)}
-                    </small>
+                    <small>{formatDateTime(message.created_at)}</small>
                   </div>
                 );
               })}
             </div>
 
-            <form
-              className="appointment-chat-form"
-              onSubmit={sendMessage}
-            >
+            <form className="appointment-chat-form" onSubmit={sendMessage}>
               <input
                 type="text"
                 value={chatMessage}
-                onChange={(event) =>
-                  setChatMessage(event.target.value)
-                }
-                placeholder="Message the patient..."
+                onChange={(event) => setChatMessage(event.target.value)}
+                placeholder="Type a clinical message..."
                 maxLength={2000}
                 aria-label="Chat message"
               />
@@ -736,7 +778,7 @@ function DoctorAppointments() {
                 type="submit"
                 disabled={!chatMessage.trim() || sendingMessage}
               >
-                {sendingMessage ? "Sending..." : "Send"}
+                {sendingMessage ? "..." : "Send"}
               </button>
             </form>
           </section>

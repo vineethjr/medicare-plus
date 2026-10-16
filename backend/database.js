@@ -104,6 +104,20 @@ addColumnIfMissing("users", "hospital", "TEXT");
 addColumnIfMissing("users", "bio", "TEXT");
 addColumnIfMissing("users", "availability", "TEXT");
 
+// Patient Profile Fields
+addColumnIfMissing("users", "age", "INTEGER");
+addColumnIfMissing("users", "gender", "TEXT");
+addColumnIfMissing("users", "blood_group", "TEXT");
+addColumnIfMissing("users", "height", "REAL");
+addColumnIfMissing("users", "weight", "REAL");
+addColumnIfMissing("users", "allergies", "TEXT");
+addColumnIfMissing("users", "chronic_conditions", "TEXT");
+addColumnIfMissing("users", "current_medications", "TEXT");
+addColumnIfMissing("users", "past_surgeries", "TEXT");
+addColumnIfMissing("users", "emergency_contact_name", "TEXT");
+addColumnIfMissing("users", "emergency_contact_phone", "TEXT");
+addColumnIfMissing("users", "emergency_contact_relation", "TEXT");
+
 // ========================================
 // APPOINTMENTS TABLE MIGRATIONS
 // ========================================
@@ -149,6 +163,40 @@ addColumnIfMissing(
   "appointments",
   "doctor_hidden",
   "INTEGER NOT NULL DEFAULT 0"
+);
+
+// ========================================
+// PAYMENT MIGRATIONS
+// ========================================
+
+addColumnIfMissing(
+  "appointments",
+  "payment_status",
+  "TEXT DEFAULT 'Unpaid'"
+);
+
+addColumnIfMissing(
+  "appointments",
+  "payment_amount",
+  "INTEGER DEFAULT 0"
+);
+
+addColumnIfMissing(
+  "appointments",
+  "payment_method",
+  "TEXT"
+);
+
+addColumnIfMissing(
+  "appointments",
+  "paid_at",
+  "TEXT"
+);
+
+addColumnIfMissing(
+  "appointments",
+  "transaction_id",
+  "TEXT"
 );
 
 // ========================================
