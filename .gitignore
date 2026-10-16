@@ -24,3 +24,8 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# SQLite WAL and SHM
+*.sqlite-shm
+*.sqlite-wal
+

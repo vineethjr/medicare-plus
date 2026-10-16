@@ -76,6 +76,7 @@ function DoctorProfile() {
 
   // Document Viewer Modal State
   const [viewingDoc, setViewingDoc] = useState(null);
+  const [docModalError, setDocModalError] = useState("");
 
   // Load Doctor Profile and Documents
   useEffect(() => {
@@ -93,6 +94,13 @@ function DoctorProfile() {
         const data = await response.json();
 
         if (!response.ok) {
+          if (response.status === 401 || data.sessionExpired) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            alert("Your session has expired. Please log in again.");
+            navigate("/login");
+            return;
+          }
           setError(data.message || "Failed to load doctor profile.");
           return;
         }
@@ -152,6 +160,13 @@ function DoctorProfile() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (response.status === 401 || data.sessionExpired) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          alert("Your session has expired. Please log in again.");
+          navigate("/login");
+          return;
+        }
         setError(data.message || "Failed to update profile.");
         return;
       }
@@ -263,14 +278,19 @@ function DoctorProfile() {
   // Handle Document Upload Submit
   async function handleUploadDocument(event) {
     event.preventDefault();
+    setDocModalError("");
 
     if (!docForm.document_name.trim()) {
-      alert("Please provide a document title.");
+      const err = "Please provide a document title.";
+      setDocModalError(err);
+      alert(err);
       return;
     }
 
     if (!docForm.file_url) {
-      alert("Please select a document file or click 'Generate Official Certificate'.");
+      const err = "Please select a document file or click 'Generate Official Certificate'.";
+      setDocModalError(err);
+      alert(err);
       return;
     }
 
@@ -289,7 +309,16 @@ function DoctorProfile() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.message || "Failed to upload document.");
+        if (res.status === 401 || data.sessionExpired) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          alert("Your session has expired. Please log in again.");
+          navigate("/login");
+          return;
+        }
+        const errorMsg = data.message || "Failed to upload qualification document.";
+        setDocModalError(errorMsg);
+        alert(errorMsg);
         return;
       }
 
@@ -306,7 +335,9 @@ function DoctorProfile() {
       setMessage("Qualification document uploaded and verified successfully!");
     } catch (err) {
       console.error("Document upload error:", err);
-      alert("Failed to upload document. Please check connection.");
+      const networkErr = "Failed to upload document. Please check connection.";
+      setDocModalError(networkErr);
+      alert(networkErr);
     } finally {
       setUploadingDoc(false);
     }
@@ -326,12 +357,22 @@ function DoctorProfile() {
         },
       });
 
-      if (res.ok) {
-        setDocuments((prev) => prev.filter((d) => d.id !== docId));
-        setMessage("Qualification document removed.");
-      } else {
-        alert("Failed to delete document.");
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 401 || data.sessionExpired) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          alert("Your session has expired. Please log in again.");
+          navigate("/login");
+          return;
+        }
+        alert(data.message || "Failed to delete document.");
+        return;
       }
+
+      setDocuments((prev) => prev.filter((d) => d.id !== docId));
+      setMessage("Qualification document removed.");
     } catch (err) {
       console.error("Delete doc error:", err);
       alert("Failed to delete document.");
@@ -690,7 +731,10 @@ function DoctorProfile() {
               <button
                 type="button"
                 className="add-document-btn"
-                onClick={() => setShowUploadModal(true)}
+                onClick={() => {
+                  setDocModalError("");
+                  setShowUploadModal(true);
+                }}
               >
                 <PlusIcon size={16} />
                 <span>Upload Document</span>
@@ -709,7 +753,10 @@ function DoctorProfile() {
                 <button
                   type="button"
                   className="empty-upload-action"
-                  onClick={() => setShowUploadModal(true)}
+                  onClick={() => {
+                    setDocModalError("");
+                    setShowUploadModal(true);
+                  }}
                 >
                   <UploadIcon size={16} /> Upload First Document
                 </button>
@@ -925,6 +972,13 @@ function DoctorProfile() {
                 <div className="file-thumb-preview">
                   <span>Selected Document Preview:</span>
                   <img src={docForm.file_url} alt="Document Preview" />
+                </div>
+              )}
+
+              {docModalError && (
+                <div className="doc-modal-error-banner">
+                  <AlertCircleIcon size={16} />
+                  <span>{docModalError}</span>
                 </div>
               )}
 

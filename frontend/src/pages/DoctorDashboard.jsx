@@ -60,6 +60,13 @@ function DoctorDashboard() {
           }),
         ]);
 
+        if (statsRes.status === 401 || apptsRes.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          navigate("/login");
+          return;
+        }
+
         if (statsRes.ok) {
           const statsData = await statsRes.json();
           setStats(statsData);

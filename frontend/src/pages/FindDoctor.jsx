@@ -77,6 +77,12 @@ function FindDoctor() {
         const data = await response.json();
 
         if (!response.ok) {
+          if (response.status === 401 || data.sessionExpired) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            navigate("/login");
+            return;
+          }
           throw new Error(data.message || "Failed to load doctors");
         }
 
@@ -96,6 +102,12 @@ function FindDoctor() {
             Authorization: `Bearer ${token}`,
           },
         });
+        if (res.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          navigate("/login");
+          return;
+        }
         if (res.ok) {
           const profileData = await res.json();
           setPatientProfile(profileData);

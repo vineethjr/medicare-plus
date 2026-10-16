@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const db = require("../database");
 
 function protect(req, res, next) {
   try {
@@ -14,7 +15,18 @@ function protect(req, res, next) {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.user = decoded;
+    const user = db
+      .prepare("SELECT id, name, email, role FROM users WHERE id = ?")
+      .get(decoded.id);
+
+    if (!user) {
+      return res.status(401).json({
+        message: "User session expired or user account not found. Please log in again.",
+        sessionExpired: true,
+      });
+    }
+
+    req.user = user;
 
     next();
   } catch (error) {

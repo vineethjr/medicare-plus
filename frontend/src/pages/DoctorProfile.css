@@ -1349,6 +1349,19 @@
   animation: spin 0.8s linear infinite;
 }
 
+.doc-modal-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-top: 14px;
+}
+
 /* ========================================
    RESPONSIVE DESIGN
    ======================================== */

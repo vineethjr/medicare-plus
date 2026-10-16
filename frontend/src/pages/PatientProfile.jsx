@@ -79,6 +79,12 @@ function PatientProfile() {
             Authorization: `Bearer ${token}`,
           },
         });
+        if (res.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          navigate("/login");
+          return;
+        }
         const data = await res.json();
         if (res.ok && data) {
           setFormData((prev) => ({
@@ -154,6 +160,13 @@ function PatientProfile() {
           type: "success",
         });
       } else {
+        if (res.status === 401 || data.sessionExpired) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          alert("Your session has expired. Please log in again.");
+          navigate("/login");
+          return;
+        }
         setMessage({
           text: data.message || "Failed to update profile.",
           type: "error",

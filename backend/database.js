@@ -256,6 +256,144 @@ db.exec(`
 `);
 
 // ========================================
+// INITIAL SEED DATA
+// ========================================
+
+function seedInitialDataIfEmpty() {
+  try {
+    const existingJenkins = db
+      .prepare("SELECT id FROM users WHERE email = ?")
+      .get("sarah.jenkins@medicare.com");
+
+    if (!existingJenkins) {
+      const bcrypt = require("bcryptjs");
+      const defaultPassword = bcrypt.hashSync("Doctor123!", 10);
+
+      const insertUser = db.prepare(`
+        INSERT INTO users (
+          name, email, password, role,
+          specialization, qualification, experience, consultation_fee,
+          hospital, bio, availability, medical_license, verification_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const insertDoc = db.prepare(`
+        INSERT INTO doctor_documents (
+          doctor_id, document_name, document_type, issuer, issue_year, file_url, file_name, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Verified')
+      `);
+
+      // Doctor 1: Dr. Sarah Jenkins
+      const doc1 = insertUser.run(
+        "Sarah Jenkins",
+        "sarah.jenkins@medicare.com",
+        defaultPassword,
+        "doctor",
+        "Cardiology",
+        "MBBS, MD (Cardiology), FACC",
+        12,
+        120,
+        "Metro Heart & Vascular Institute",
+        "Board-certified Cardiologist with over 12 years of clinical excellence in cardiovascular interventions, preventive cardiology, and hypertension management.",
+        "Monday - Friday, 09:00 AM - 05:00 PM",
+        "MCI-2012-CRD-8492",
+        "Verified"
+      );
+
+      insertDoc.run(
+        doc1.lastInsertRowid,
+        "MBBS & MD Cardiology Specialist Degree",
+        "Degree Certificate",
+        "Harvard Medical School & Teaching Hospitals",
+        "2012",
+        "sample://harvard-cardiology-md.pdf",
+        "Harvard_MD_Cardiology_Degree.pdf"
+      );
+
+      insertDoc.run(
+        doc1.lastInsertRowid,
+        "State Medical Council License & Board Certification",
+        "Medical License / Registration",
+        "National Medical Council & Board of Cardiovascular Care",
+        "2014",
+        "sample://cardio-board-license.pdf",
+        "MCI_Cardio_License_8492.pdf"
+      );
+
+      // Doctor 2: Dr. Michael Vance
+      const doc2 = insertUser.run(
+        "Michael Vance",
+        "michael.vance@medicare.com",
+        defaultPassword,
+        "doctor",
+        "Neurology",
+        "MBBS, DM (Neurology), FAAN",
+        9,
+        150,
+        "Apex Brain & Spine Hospital",
+        "Senior Neurologist specializing in neuro-critical care, stroke management, chronic migraines, and sleep neurology disorders.",
+        "Tuesday - Saturday, 10:00 AM - 06:00 PM",
+        "MCI-2015-NEU-3921",
+        "Verified"
+      );
+
+      insertDoc.run(
+        doc2.lastInsertRowid,
+        "Doctorate of Medicine (DM Neurology) Certificate",
+        "Degree Certificate",
+        "Johns Hopkins University School of Medicine",
+        "2015",
+        "sample://johns-hopkins-neurology-dm.pdf",
+        "JohnsHopkins_DM_Neurology.pdf"
+      );
+
+      insertDoc.run(
+        doc2.lastInsertRowid,
+        "American Academy of Neurology Fellow Accreditation",
+        "Fellowship / Specialty Certificate",
+        "American Academy of Neurology",
+        "2018",
+        "sample://aan-fellowship-cert.pdf",
+        "AAN_Fellowship_Credential.pdf"
+      );
+
+      // Doctor 3: Dr. Emily Chen
+      const doc3 = insertUser.run(
+        "Emily Chen",
+        "emily.chen@medicare.com",
+        defaultPassword,
+        "doctor",
+        "Pediatrics",
+        "MBBS, MD (Pediatrics), FAAP",
+        8,
+        95,
+        "St. Jude Children's Wellness Hospital",
+        "Passionate pediatric specialist providing comprehensive healthcare from infancy through adolescence, newborn care, and pediatric immunizations.",
+        "Monday - Thursday, 08:30 AM - 04:30 PM",
+        "MCI-2016-PED-5742",
+        "Verified"
+      );
+
+      insertDoc.run(
+        doc3.lastInsertRowid,
+        "MD Pediatrics Specialty Qualification",
+        "Degree Certificate",
+        "Stanford University School of Medicine",
+        "2016",
+        "sample://stanford-md-pediatrics.pdf",
+        "Stanford_MD_Pediatrics.pdf"
+      );
+
+      console.log("Database initialized with verified starter doctors and credentials.");
+    }
+  } catch (err) {
+    console.error("Error seeding initial data:", err.message);
+  }
+}
+
+seedInitialDataIfEmpty();
+
+// ========================================
 // EXPORT DATABASE
 // ========================================
 

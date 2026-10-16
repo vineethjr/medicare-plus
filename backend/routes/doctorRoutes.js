@@ -213,7 +213,9 @@ router.post("/documents", protect, (req, res) => {
     console.error("Add doctor document error:", error.message);
 
     res.status(500).json({
-      message: "Failed to upload qualification document",
+      message: error.message
+        ? `Failed to upload qualification document: ${error.message}`
+        : "Failed to upload qualification document",
     });
   }
 });

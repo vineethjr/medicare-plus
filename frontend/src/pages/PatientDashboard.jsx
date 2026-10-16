@@ -56,6 +56,13 @@ function PatientDashboard() {
 
         const data = await response.json();
 
+        if (response.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          navigate("/login");
+          return;
+        }
+
         if (response.ok) {
           setStats(data);
         } else {
