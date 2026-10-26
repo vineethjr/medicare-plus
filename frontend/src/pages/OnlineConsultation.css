@@ -1048,3 +1048,61 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+/* ADDITIONAL WEBRTC PARTICIPANT & DIAGNOSTIC STYLES */
+.waiting-status-badges-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.waiting-secure-tag.active {
+  color: #34d399 !important;
+  background: rgba(16, 185, 129, 0.18) !important;
+  border-color: rgba(16, 185, 129, 0.45) !important;
+}
+
+.waiting-secure-tag.waiting {
+  color: #38bdf8 !important;
+  background: rgba(14, 165, 233, 0.12) !important;
+  border-color: rgba(14, 165, 233, 0.3) !important;
+}
+
+.waiting-count-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.waiting-single-tester-tip {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #cbd5e1;
+  text-align: left;
+  line-height: 1.45;
+}
+
+.waiting-single-tester-tip svg {
+  color: #20c7b5;
+  flex-shrink: 0;
+}
+
+.waiting-single-tester-tip strong {
+  color: #38bdf8;
+}

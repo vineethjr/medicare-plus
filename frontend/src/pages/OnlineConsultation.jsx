@@ -32,7 +32,13 @@ import { API_URL, SOCKET_URL } from "../config";
 const rtcConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:19302" },
+    { urls: "stun:global.stun.twilio.com:3478" },
   ],
+  iceCandidatePoolSize: 10,
 };
 
 function readUser() {
@@ -56,6 +62,8 @@ function OnlineConsultation() {
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
   const [participantConnected, setParticipantConnected] = useState(false);
+  const [participantCount, setParticipantCount] = useState(1);
+  const [signalingStatus, setSignalingStatus] = useState("waiting");
 
   // Active drawer tab: null (closed), 'dossier', 'prescription', 'chat'
   const [activeDrawer, setActiveDrawer] = useState(null);
@@ -89,6 +97,8 @@ function OnlineConsultation() {
   const peerConnectionRef = useRef(null);
   const socketRef = useRef(null);
   const appointmentRef = useRef(null);
+  const iceCandidateQueueRef = useRef([]);
+  const isInitiatingRef = useRef(false);
 
   const token = localStorage.getItem("token");
   const isDoctor = user.role === "doctor";
@@ -264,41 +274,185 @@ function OnlineConsultation() {
       return peerConnectionRef.current;
     }
 
+    console.log("Initializing RTCPeerConnection with STUN mesh...");
     const pc = new RTCPeerConnection(rtcConfiguration);
     peerConnectionRef.current = pc;
 
+    // Attach local stream audio & video tracks
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => {
         pc.addTrack(track, localStreamRef.current);
       });
     }
 
+    // Remote track reception
     pc.ontrack = (event) => {
-      if (remoteVideoRef.current && event.streams[0]) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-        remoteVideoRef.current.play().catch(() => {});
-      }
-      setParticipantConnected(true);
-    };
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate && socketRef.current?.connected) {
-        socketRef.current.emit("ice-candidate", {
-          appointmentId,
-          candidate: event.candidate,
+      console.log("WebRTC Remote track received:", event.track.kind);
+      if (remoteVideoRef.current) {
+        if (event.streams && event.streams[0]) {
+          remoteVideoRef.current.srcObject = event.streams[0];
+        } else {
+          let currentStream = remoteVideoRef.current.srcObject;
+          if (!currentStream || !(currentStream instanceof MediaStream)) {
+            currentStream = new MediaStream();
+            remoteVideoRef.current.srcObject = currentStream;
+          }
+          currentStream.addTrack(event.track);
+        }
+        remoteVideoRef.current.play().catch((err) => {
+          console.log("Remote video autoplay suppressed:", err);
         });
       }
+      setParticipantConnected(true);
+      setSignalingStatus("connected");
     };
 
+    // ICE Candidate generation -> broadcast to room
+    pc.onicecandidate = (event) => {
+      if (event.candidate && socketRef.current?.connected) {
+        const payload = {
+          appointmentId,
+          candidate: event.candidate,
+        };
+        socketRef.current.emit("webrtc-ice-candidate", payload);
+        socketRef.current.emit("ice-candidate", payload);
+      }
+    };
+
+    // Connection state listeners
     pc.onconnectionstatechange = () => {
-      const state = pc.connectionState;
-      setParticipantConnected(state === "connected");
-      if (["failed", "closed"].includes(state)) {
+      console.log("WebRTC Connection State:", pc.connectionState);
+      if (pc.connectionState === "connected") {
+        setParticipantConnected(true);
+        setSignalingStatus("connected");
+      } else if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
         setParticipantConnected(false);
       }
     };
 
+    pc.oniceconnectionstatechange = () => {
+      console.log("ICE Connection State:", pc.iceConnectionState);
+      if (["connected", "completed"].includes(pc.iceConnectionState)) {
+        setParticipantConnected(true);
+        setSignalingStatus("connected");
+      } else if (pc.iceConnectionState === "failed") {
+        console.warn("ICE connection failed, triggering iceRestart");
+        if (pc.restartIce) pc.restartIce();
+      }
+    };
+
     return pc;
+  }
+
+  // --------------------------------------------------
+  // WEBRTC SIGNALING HANDLERS
+  // --------------------------------------------------
+  async function initiateOffer() {
+    if (!isDoctor) return;
+    if (isInitiatingRef.current) return;
+
+    try {
+      isInitiatingRef.current = true;
+      setSignalingStatus("initiating");
+      const pc = createPeerConnection();
+
+      // Only create offer when signaling state is stable
+      if (pc.signalingState !== "stable") {
+        console.log("Signaling state not stable for offer:", pc.signalingState);
+        isInitiatingRef.current = false;
+        return;
+      }
+
+      console.log("Doctor generating WebRTC offer...");
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
+      await pc.setLocalDescription(offer);
+
+      const payload = { appointmentId, offer };
+      socketRef.current?.emit("webrtc-offer", payload);
+      socketRef.current?.emit("offer", payload);
+      console.log("WebRTC offer dispatched to consultation room");
+    } catch (err) {
+      console.error("Error creating WebRTC offer:", err);
+    } finally {
+      setTimeout(() => {
+        isInitiatingRef.current = false;
+      }, 1200);
+    }
+  }
+
+  async function handleReceiveOffer({ offer }) {
+    if (isDoctor) return; // Doctor initiates, doesn't process incoming offers
+    if (!offer) return;
+
+    try {
+      console.log("Patient received WebRTC offer. Creating answer...");
+      setSignalingStatus("connecting");
+      const pc = createPeerConnection();
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+      // Flush any queued ICE candidates that arrived before remoteDescription
+      while (iceCandidateQueueRef.current.length > 0) {
+        const queuedCandidate = iceCandidateQueueRef.current.shift();
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(queuedCandidate));
+        } catch (e) {
+          console.warn("Error adding queued ICE candidate:", e);
+        }
+      }
+
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      const payload = { appointmentId, answer };
+      socketRef.current?.emit("webrtc-answer", payload);
+      socketRef.current?.emit("answer", payload);
+      console.log("WebRTC answer dispatched to doctor");
+    } catch (err) {
+      console.error("Error processing WebRTC offer:", err);
+    }
+  }
+
+  async function handleReceiveAnswer({ answer }) {
+    if (!isDoctor) return;
+    if (!answer) return;
+
+    try {
+      console.log("Doctor received WebRTC answer.");
+      const pc = peerConnectionRef.current;
+      if (pc && pc.signalingState !== "stable") {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+
+        // Flush queued ICE candidates
+        while (iceCandidateQueueRef.current.length > 0) {
+          const queuedCandidate = iceCandidateQueueRef.current.shift();
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(queuedCandidate));
+          } catch (e) {
+            console.warn("Error adding queued ICE candidate:", e);
+          }
+        }
+        console.log("Doctor successfully set remote description from answer");
+      }
+    } catch (err) {
+      console.error("Error processing WebRTC answer:", err);
+    }
+  }
+
+  async function handleReceiveCandidate({ candidate }) {
+    if (!candidate) return;
+    try {
+      const pc = peerConnectionRef.current;
+      if (!pc || !pc.remoteDescription || !pc.remoteDescription.type) {
+        iceCandidateQueueRef.current.push(candidate);
+      } else {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      }
+    } catch (err) {
+      console.warn("Error adding received ICE candidate:", err);
+    }
   }
 
   // --------------------------------------------------
@@ -320,6 +474,17 @@ function OnlineConsultation() {
         localVideoRef.current.play().catch(() => {});
       }
 
+      // If peer connection already instantiated, ensure tracks attached
+      if (peerConnectionRef.current) {
+        stream.getTracks().forEach((track) => {
+          const senders = peerConnectionRef.current.getSenders();
+          const alreadyAdded = senders.some((s) => s.track === track);
+          if (!alreadyAdded) {
+            peerConnectionRef.current.addTrack(track, stream);
+          }
+        });
+      }
+
       setCameraOn(stream.getVideoTracks().some((t) => t.enabled));
       setMicOn(stream.getAudioTracks().some((t) => t.enabled));
       return stream;
@@ -336,7 +501,7 @@ function OnlineConsultation() {
   }
 
   // --------------------------------------------------
-  // SOCKET.IO SIGNALING
+  // SOCKET.IO SIGNALING MESH
   // --------------------------------------------------
   useEffect(() => {
     if (!appointment || !token) return;
@@ -358,56 +523,60 @@ function OnlineConsultation() {
         socketRef.current = socket;
 
         socket.on("connect", () => {
+          console.log("Connected to telehealth signaling server. Joining room:", appointmentId);
           socket.emit("join-consultation", {
             appointmentId,
             user,
           });
         });
 
-        socket.on("participant-joined", async () => {
+        socket.on("room-status", ({ participantCount: count }) => {
+          console.log("Telehealth room status:", count, "participants");
+          setParticipantCount(count || 1);
+          if (count >= 2 && isDoctor) {
+            initiateOffer();
+          }
+        });
+
+        socket.on("participant-joined", ({ user: newUser, participantCount: count }) => {
+          console.log("Participant joined room:", newUser?.name);
+          setParticipantCount((prev) => Math.max(prev, count || 2));
           if (isDoctor) {
-            const pc = createPeerConnection();
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socket.emit("offer", { appointmentId, offer });
+            initiateOffer();
           }
         });
 
-        socket.on("offer", async ({ offer }) => {
-          if (!isDoctor) {
-            const pc = createPeerConnection();
-            await pc.setRemoteDescription(new RTCSessionDescription(offer));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            socket.emit("answer", { appointmentId, answer });
+        socket.on("ready-for-call", ({ participantCount: count }) => {
+          console.log("Ready for call signal received. Count:", count);
+          setParticipantCount((prev) => Math.max(prev, count || 2));
+          if (isDoctor) {
+            initiateOffer();
           }
         });
 
-        socket.on("answer", async ({ answer }) => {
-          if (isDoctor && peerConnectionRef.current) {
-            await peerConnectionRef.current.setRemoteDescription(
-              new RTCSessionDescription(answer)
-            );
-          }
-        });
+        // Dual event listeners for offer, answer, and candidates
+        socket.on("webrtc-offer", handleReceiveOffer);
+        socket.on("offer", handleReceiveOffer);
 
-        socket.on("ice-candidate", async ({ candidate }) => {
-          try {
-            if (peerConnectionRef.current) {
-              await peerConnectionRef.current.addIceCandidate(
-                new RTCIceCandidate(candidate)
-              );
-            }
-          } catch {
-            // ignore ice errors
-          }
-        });
+        socket.on("webrtc-answer", handleReceiveAnswer);
+        socket.on("answer", handleReceiveAnswer);
+
+        socket.on("ice-candidate", handleReceiveCandidate);
+        socket.on("webrtc-ice-candidate", handleReceiveCandidate);
 
         socket.on("participant-left", () => {
+          console.log("Participant left consultation");
+          setParticipantCount(1);
           setParticipantConnected(false);
+          setSignalingStatus("waiting");
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = null;
           }
+          if (peerConnectionRef.current) {
+            peerConnectionRef.current.close();
+            peerConnectionRef.current = null;
+          }
+          iceCandidateQueueRef.current = [];
         });
       } catch (err) {
         console.error("Signaling error:", err);
@@ -418,7 +587,10 @@ function OnlineConsultation() {
 
     return () => {
       cancelled = true;
-      if (socket) socket.disconnect();
+      if (socket) {
+        socket.emit("leave-consultation", { appointmentId });
+        socket.disconnect();
+      }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop());
       }
@@ -428,6 +600,7 @@ function OnlineConsultation() {
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
       }
+      iceCandidateQueueRef.current = [];
     };
   }, [appointment, appointmentId, isDoctor, token]);
 
@@ -672,11 +845,22 @@ function OnlineConsultation() {
                   {otherPersonName.charAt(0).toUpperCase()}
                 </div>
                 <h3>
-                  Connecting with {isDoctor ? otherPersonName : `Dr. ${otherPersonName}`}
+                  {participantCount >= 2
+                    ? `${isDoctor ? otherPersonName : `Dr. ${otherPersonName}`} is in the room!`
+                    : `Connecting with ${isDoctor ? otherPersonName : `Dr. ${otherPersonName}`}`}
                 </h3>
                 <p>
-                  Waiting for participant to enter encrypted room <strong>#MED-{appointment.id}</strong>
+                  {participantCount >= 2 ? (
+                    <>
+                      Both participants are in encrypted room <strong>#MED-{appointment.id}</strong>. Establishing peer-to-peer WebRTC video stream...
+                    </>
+                  ) : (
+                    <>
+                      Waiting for participant to enter encrypted room <strong>#MED-{appointment.id}</strong>
+                    </>
+                  )}
                 </p>
+
                 <div className="waiting-pulse-meter">
                   <span className="meter-bar"></span>
                   <span className="meter-bar"></span>
@@ -684,9 +868,28 @@ function OnlineConsultation() {
                   <span className="meter-bar"></span>
                   <span className="meter-bar"></span>
                 </div>
-                <div className="waiting-secure-tag">
-                  <ShieldCheckIcon size={14} /> Peer-to-Peer Signaling Handshake Active
+
+                <div className="waiting-status-badges-row">
+                  <div className={`waiting-secure-tag ${participantCount >= 2 ? "active" : "waiting"}`}>
+                    <ShieldCheckIcon size={14} />{" "}
+                    {participantCount >= 2
+                      ? "P2P WebRTC Handshake in Progress"
+                      : "Room Ready • Awaiting Participant"}
+                  </div>
+                  <div className="waiting-count-tag">
+                    <UserIcon size={13} /> {participantCount} / 2 in Room
+                  </div>
                 </div>
+
+                {participantCount <= 1 && (
+                  <div className="waiting-single-tester-tip">
+                    <SparklesIcon size={14} />
+                    <span>
+                      <strong>Testing video call?</strong> In a Private/Incognito window, log in as{" "}
+                      <strong>{isDoctor ? "the Patient" : `Dr. ${otherPersonName}`}</strong> and join room <strong>#MED-{appointment.id}</strong>.
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}

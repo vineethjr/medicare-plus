@@ -50,7 +50,7 @@ const fs = require("fs");
 const frontendDist = path.join(__dirname, "../frontend/dist");
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
-  app.get("*", (req, res, next) => {
+  app.use((req, res, next) => {
     if (req.path.startsWith("/api") || req.path.startsWith("/socket.io")) {
       return next();
     }
@@ -95,167 +95,120 @@ io.on("connection", (socket) => {
   // JOIN CONSULTATION
   // ======================================
 
-  socket.on(
-    "join-consultation",
-    ({ appointmentId, user }) => {
-      const roomId =
-        `consultation-${appointmentId}`;
+  socket.on("join-consultation", ({ appointmentId, user }) => {
+    const roomId = `consultation-${appointmentId}`;
+    socket.join(roomId);
 
-      socket.join(roomId);
+    console.log(`${user?.name || "User"} (${user?.role || "unknown"}) joined ${roomId}`);
 
-      console.log(
-        `${user?.name || "User"} joined ${roomId}`
-      );
+    const room = io.sockets.adapter.rooms.get(roomId);
+    const participantCount = room ? room.size : 1;
 
-      // Notify other participant
-      socket.to(roomId).emit(
-        "participant-joined",
-        {
-          socketId: socket.id,
-          user,
-        }
-      );
+    // Notify other participant that this user joined
+    socket.to(roomId).emit("participant-joined", {
+      socketId: socket.id,
+      user,
+      participantCount,
+    });
 
-      // Get participant count
-      const room =
-        io.sockets.adapter.rooms.get(roomId);
+    // Broadcast room status to everyone in the room
+    io.to(roomId).emit("room-status", {
+      participantCount,
+      roomId,
+    });
 
-      const participantCount =
-        room ? room.size : 1;
-
-      io.to(roomId).emit(
-        "room-status",
-        {
-          participantCount,
-        }
-      );
+    // When 2 or more participants are in the room, signal ready for WebRTC negotiation
+    if (participantCount >= 2) {
+      io.to(roomId).emit("ready-for-call", {
+        participantCount,
+      });
     }
-  );
+  });
 
   // ======================================
-  // WEBRTC OFFER
+  // WEBRTC OFFER (supports both "webrtc-offer" and "offer")
   // ======================================
 
-  socket.on(
-    "webrtc-offer",
-    ({ appointmentId, offer }) => {
-      const roomId =
-        `consultation-${appointmentId}`;
-
-      socket.to(roomId).emit(
-        "webrtc-offer",
-        {
-          offer,
-          senderId: socket.id,
-        }
-      );
-    }
-  );
+  const handleOffer = ({ appointmentId, offer }) => {
+    const roomId = `consultation-${appointmentId}`;
+    socket.to(roomId).emit("webrtc-offer", { offer, senderId: socket.id });
+    socket.to(roomId).emit("offer", { offer, senderId: socket.id });
+  };
+  socket.on("webrtc-offer", handleOffer);
+  socket.on("offer", handleOffer);
 
   // ======================================
-  // WEBRTC ANSWER
+  // WEBRTC ANSWER (supports both "webrtc-answer" and "answer")
   // ======================================
 
-  socket.on(
-    "webrtc-answer",
-    ({ appointmentId, answer }) => {
-      const roomId =
-        `consultation-${appointmentId}`;
-
-      socket.to(roomId).emit(
-        "webrtc-answer",
-        {
-          answer,
-          senderId: socket.id,
-        }
-      );
-    }
-  );
+  const handleAnswer = ({ appointmentId, answer }) => {
+    const roomId = `consultation-${appointmentId}`;
+    socket.to(roomId).emit("webrtc-answer", { answer, senderId: socket.id });
+    socket.to(roomId).emit("answer", { answer, senderId: socket.id });
+  };
+  socket.on("webrtc-answer", handleAnswer);
+  socket.on("answer", handleAnswer);
 
   // ======================================
-  // ICE CANDIDATE
+  // ICE CANDIDATE (supports both "ice-candidate" and "webrtc-ice-candidate")
   // ======================================
 
-  socket.on(
-    "ice-candidate",
-    ({ appointmentId, candidate }) => {
-      const roomId =
-        `consultation-${appointmentId}`;
-
-      socket.to(roomId).emit(
-        "ice-candidate",
-        {
-          candidate,
-          senderId: socket.id,
-        }
-      );
-    }
-  );
+  const handleCandidate = ({ appointmentId, candidate }) => {
+    const roomId = `consultation-${appointmentId}`;
+    socket.to(roomId).emit("ice-candidate", { candidate, senderId: socket.id });
+    socket.to(roomId).emit("webrtc-ice-candidate", { candidate, senderId: socket.id });
+  };
+  socket.on("ice-candidate", handleCandidate);
+  socket.on("webrtc-ice-candidate", handleCandidate);
 
   // ======================================
   // CONSULTATION CHAT
   // ======================================
 
-  socket.on(
-    "consultation-message",
-    ({ appointmentId, message, user }) => {
-      const roomId =
-        `consultation-${appointmentId}`;
-
-      io.to(roomId).emit(
-        "consultation-message",
-        {
-          message,
-          user,
-          timestamp: new Date().toISOString(),
-        }
-      );
-    }
-  );
+  socket.on("consultation-message", ({ appointmentId, message, user }) => {
+    const roomId = `consultation-${appointmentId}`;
+    io.to(roomId).emit("consultation-message", {
+      message,
+      user,
+      timestamp: new Date().toISOString(),
+    });
+  });
 
   // ======================================
   // LEAVE CONSULTATION
   // ======================================
 
-  socket.on(
-    "leave-consultation",
-    ({ appointmentId }) => {
-      const roomId =
-        `consultation-${appointmentId}`;
+  const handleLeaveRoom = (appointmentId) => {
+    const roomId = `consultation-${appointmentId}`;
+    socket.leave(roomId);
+    socket.to(roomId).emit("participant-left", { socketId: socket.id });
 
-      socket.leave(roomId);
+    const room = io.sockets.adapter.rooms.get(roomId);
+    const participantCount = room ? room.size : 0;
+    io.to(roomId).emit("room-status", { participantCount });
+  };
 
-      socket.to(roomId).emit(
-        "participant-left",
-        {
-          socketId: socket.id,
-        }
-      );
+  socket.on("leave-consultation", ({ appointmentId }) => {
+    handleLeaveRoom(appointmentId);
+  });
 
-      const room =
-        io.sockets.adapter.rooms.get(roomId);
+  // ======================================
+  // DISCONNECT & DISCONNECTING
+  // ======================================
 
-      const participantCount =
-        room ? room.size : 0;
-
-      io.to(roomId).emit(
-        "room-status",
-        {
-          participantCount,
-        }
-      );
+  socket.on("disconnecting", () => {
+    for (const roomId of socket.rooms) {
+      if (roomId.startsWith("consultation-")) {
+        socket.to(roomId).emit("participant-left", { socketId: socket.id });
+        const room = io.sockets.adapter.rooms.get(roomId);
+        const participantCount = room ? Math.max(0, room.size - 1) : 0;
+        io.to(roomId).emit("room-status", { participantCount });
+      }
     }
-  );
-
-  // ======================================
-  // DISCONNECT
-  // ======================================
+  });
 
   socket.on("disconnect", () => {
-    console.log(
-      "Socket disconnected:",
-      socket.id
-    );
+    console.log("Socket disconnected:", socket.id);
   });
 });
 
