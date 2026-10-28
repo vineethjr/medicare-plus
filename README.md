@@ -67,7 +67,7 @@ This project is decoupled into a **Node.js Express + Socket.IO Backend** and a *
 
 ---
 
-## 💻 Local Development Setup
+## 💻 Local Development Module
 
 ### 1. Prerequisites
 - Node.js (v18 or higher)
