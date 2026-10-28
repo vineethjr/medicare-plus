@@ -104,3 +104,24 @@ npm run dev
 - **Frontend**: React 19, Vite, React Router 7, Socket.IO Client, Pure CSS with Cyber-Clinical Obsidian Dark Theme.
 - **Backend**: Node.js, Express 5, Better-SQLite3, Socket.IO, JWT, BcryptJS.
 - **Real-Time Communication**: WebRTC P2P Video with STUN fallback & Socket.IO signaling.
+
+- ---
+
+## Troubleshooting
+
+### 1. Dependency Installation Problems
+
+If `npm install` fails, check your internet connection and verify that Node.js and npm are installed correctly.
+
+### 2. Backend Connection Problems
+
+If the frontend cannot communicate with the backend, confirm that the backend server is running and that the configured backend URL is correct.
+
+### 3. Application Startup Problems
+
+If the application fails to start, check the terminal for error messages and confirm that commands are being executed from the correct project directory.
+
+### 4. Environment Configuration
+
+Verify that the required environment variables are configured correctly. Never commit passwords, API keys, or JWT secrets to the repository.
+
