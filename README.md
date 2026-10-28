@@ -125,3 +125,25 @@ If the application fails to start, check the terminal for error messages and con
 
 Verify that the required environment variables are configured correctly. Never commit passwords, API keys, or JWT secrets to the repository.
 
+---
+
+## Testing Checklist
+
+The following test cases should be performed to check the main workflows of MediCare+.
+
+| Test Case              | Expected Result                                                             |
+| ---------------------- | --------------------------------------------------------------------------- |
+| Patient login          | Valid patient credentials allow access to the patient dashboard.            |
+| Doctor login           | Valid doctor credentials allow access to the doctor dashboard.              |
+| Doctor search          | Available doctors are displayed based on the search criteria.               |
+| Specialization filter  | Doctors matching the selected specialization are displayed.                 |
+| Appointment booking    | A valid appointment request is submitted successfully.                      |
+| Appointment status     | Updated appointment status is displayed to the patient.                     |
+| Medical records        | Patients can view their own available consultation records.                 |
+| Online consultation    | Audio, video, and chat work between the patient and doctor.                 |
+| Prescription access    | Patients can view and download prescriptions when the feature is available. |
+| Mobile app integration | The app communicates with the backend and displays the correct data.        |
+
+**Note:** These are planned test cases. Record the actual results during testing, and mark a test as passed only after verifying the expected behaviour.
+
+
