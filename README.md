@@ -69,11 +69,20 @@ This project is decoupled into a **Node.js Express + Socket.IO Backend** and a *
 
 ## 💻 Local Development Module
 
-### 1. Prerequisites
+## 1. Prerequisites
+
 - Node.js (v18 or higher)
 - npm
+- A modern web browser such as Chrome or Firefox
 
-### 2. Backend Setup
+To verify your installation, open a terminal and run:
+
+```bash
+node --version
+npm --version
+```
+
+## 2. Backend management 
 ```bash
 cd backend
 npm install
@@ -81,7 +90,7 @@ npm run dev
 # Server runs at http://localhost:5000
 ```
 
-### 3. Frontend Setup
+### 3. Frontend management
 ```bash
 cd frontend
 npm install
@@ -95,3 +104,46 @@ npm run dev
 - **Frontend**: React 19, Vite, React Router 7, Socket.IO Client, Pure CSS with Cyber-Clinical Obsidian Dark Theme.
 - **Backend**: Node.js, Express 5, Better-SQLite3, Socket.IO, JWT, BcryptJS.
 - **Real-Time Communication**: WebRTC P2P Video with STUN fallback & Socket.IO signaling.
+
+- ---
+
+## Troubleshooting
+
+### 1. Dependency Installation Problems
+
+If `npm install` fails, check your internet connection and verify that Node.js and npm are installed correctly.
+
+### 2. Backend Connection Problems
+
+If the frontend cannot communicate with the backend, confirm that the backend server is running and that the configured backend URL is correct.
+
+### 3. Application Startup Problems
+
+If the application fails to start, check the terminal for error messages and confirm that commands are being executed from the correct project directory.
+
+### 4. Environment Configuration
+
+Verify that the required environment variables are configured correctly. Never commit passwords, API keys, or JWT secrets to the repository.
+
+---
+
+## Testing Checklist
+
+The following test cases should be performed to check the main workflows of MediCare+.
+
+| Test Case              | Expected Result                                                             |
+| ---------------------- | --------------------------------------------------------------------------- |
+| Patient login          | Valid patient credentials allow access to the patient dashboard.            |
+| Doctor login           | Valid doctor credentials allow access to the doctor dashboard.              |
+| Doctor search          | Available doctors are displayed based on the search criteria.               |
+| Specialization filter  | Doctors matching the selected specialization are displayed.                 |
+| Appointment booking    | A valid appointment request is submitted successfully.                      |
+| Appointment status     | Updated appointment status is displayed to the patient.                     |
+| Medical records        | Patients can view their own available consultation records.                 |
+| Online consultation    | Audio, video, and chat work between the patient and doctor.                 |
+| Prescription access    | Patients can view and download prescriptions when the feature is available. |
+| Mobile app integration | The app communicates with the backend and displays the correct data.        |
+
+**Note:** These are planned test cases. Record the actual results during testing, and mark a test as passed only after verifying the expected behaviour.
+
+
