@@ -69,11 +69,20 @@ This project is decoupled into a **Node.js Express + Socket.IO Backend** and a *
 
 ## 💻 Local Development Setup
 
-### 1. Prerequisites
+## 1. Prerequisites
+
 - Node.js (v18 or higher)
 - npm
+- A modern web browser such as Chrome or Firefox
 
-### 2. Backend Setup
+To verify your installation, open a terminal and run:
+
+```bash
+node --version
+npm --version
+```
+
+## 2. Backend management 
 ```bash
 cd backend
 npm install
@@ -81,7 +90,7 @@ npm run dev
 # Server runs at http://localhost:5000
 ```
 
-### 3. Frontend Setup
+### 3. Frontend management
 ```bash
 cd frontend
 npm install
