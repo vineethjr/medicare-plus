@@ -13,7 +13,8 @@ function protect(req, res, next) {
 
     const token = authHeader.split(" ")[1];
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const secret = process.env.JWT_SECRET || "medicare_plus_secret_2026";
+    const decoded = jwt.verify(token, secret);
 
     const user = db
       .prepare("SELECT id, name, email, role FROM users WHERE id = ?")

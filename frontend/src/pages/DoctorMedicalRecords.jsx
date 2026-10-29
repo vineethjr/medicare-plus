@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./DoctorMedicalRecords.css";
+import PrescriptionQRCode from "../components/PrescriptionQRCode";
 import { API_URL } from "../config";
 
 function DoctorMedicalRecords() {
@@ -11,6 +12,7 @@ function DoctorMedicalRecords() {
   const [error, setError] = useState("");
 
   const token = localStorage.getItem("token");
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   useEffect(() => {
     async function fetchRecords() {
@@ -279,13 +281,23 @@ function DoctorMedicalRecords() {
 
                         <div className="record-section-title">
                           <span>02</span>
-                          Prescription
+                          Prescription & Verified QR
                         </div>
 
                         <p>
                           {record.prescription ||
                             "No prescription provided."}
                         </p>
+
+                        <PrescriptionQRCode
+                          doctorId={record.doctor_id || user.id}
+                          doctorName={record.doctor_name || user.name}
+                          specialization={record.specialization || user.specialization}
+                          qualification={record.qualification || user.qualification}
+                          medicalLicense={record.medical_license || user.medical_license}
+                          hospital={record.hospital || user.hospital}
+                          prescriptionId={record.id}
+                        />
 
                       </div>
 

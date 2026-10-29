@@ -61,6 +61,15 @@ router.post("/", protect, (req, res) => {
       `).run(appointment.id);
     }
 
+    // The prescription can be a JSON string containing medicines
+    // or legacy plain text from older consultation records.
+    const prescriptionText =
+      typeof prescription === "string"
+        ? prescription
+        : prescription == null
+          ? ""
+          : JSON.stringify(prescription);
+
     const existingRecord = db
       .prepare(
         `SELECT id
@@ -70,20 +79,26 @@ router.post("/", protect, (req, res) => {
       .get(appointment_id);
 
     if (existingRecord) {
-      return res.status(409).json({
-        message:
-          "A consultation record already exists for this appointment.",
+      db.prepare(
+        `UPDATE consultation_records
+         SET diagnosis = ?,
+             prescription = ?,
+             doctor_notes = ?,
+             follow_up_date = ?
+         WHERE id = ?`
+      ).run(
+        typeof diagnosis === "string" ? diagnosis.trim() : "",
+        prescriptionText,
+        typeof doctor_notes === "string" ? doctor_notes.trim() : "",
+        typeof follow_up_date === "string" ? follow_up_date : "",
+        existingRecord.id
+      );
+
+      return res.status(200).json({
+        message: "Consultation record and prescription updated successfully.",
+        consultationId: existingRecord.id,
       });
     }
-
-    // The prescription can be a JSON string containing medicines
-    // or legacy plain text from older consultation records.
-    const prescriptionText =
-      typeof prescription === "string"
-        ? prescription
-        : prescription == null
-          ? ""
-          : JSON.stringify(prescription);
 
     const result = db
       .prepare(
@@ -138,6 +153,8 @@ router.get("/doctor", protect, (req, res) => {
         `SELECT
           cr.id,
           cr.appointment_id,
+          cr.doctor_id,
+          cr.patient_id,
           cr.diagnosis,
           cr.prescription,
           cr.doctor_notes,
@@ -145,10 +162,17 @@ router.get("/doctor", protect, (req, res) => {
           cr.created_at,
           users.name AS patient_name,
           users.email AS patient_email,
+          doc.name AS doctor_name,
+          doc.specialization,
+          doc.qualification,
+          doc.medical_license,
+          doc.hospital,
           appointments.appointment_date,
-          appointments.appointment_time
+          appointments.appointment_time,
+          appointments.consultation_mode
         FROM consultation_records AS cr
         JOIN users ON cr.patient_id = users.id
+        JOIN users AS doc ON cr.doctor_id = doc.id
         JOIN appointments ON cr.appointment_id = appointments.id
         WHERE cr.doctor_id = ?
         ORDER BY cr.created_at DESC`
@@ -182,6 +206,7 @@ router.get("/patient", protect, (req, res) => {
         `SELECT
           cr.id,
           cr.appointment_id,
+          cr.doctor_id,
           cr.diagnosis,
           cr.prescription,
           cr.doctor_notes,
@@ -189,9 +214,14 @@ router.get("/patient", protect, (req, res) => {
           cr.created_at,
           users.name AS doctor_name,
           users.specialization,
+          users.qualification,
+          users.medical_license,
           users.hospital,
+          users.experience,
+          users.verification_status,
           appointments.appointment_date,
-          appointments.appointment_time
+          appointments.appointment_time,
+          appointments.consultation_mode
         FROM consultation_records AS cr
         JOIN users ON cr.doctor_id = users.id
         JOIN appointments ON cr.appointment_id = appointments.id
@@ -207,6 +237,92 @@ router.get("/patient", protect, (req, res) => {
     return res.status(500).json({
       message: "Failed to load medical records.",
     });
+  }
+});
+
+
+// ========================================
+// PUBLIC PRESCRIPTION VERIFICATION
+// GET /api/consultations/verify/:id
+// ========================================
+router.get("/verify/:id", (req, res) => {
+  try {
+    const record = db
+      .prepare(
+        `SELECT
+          cr.id,
+          cr.appointment_id,
+          cr.doctor_id,
+          cr.diagnosis,
+          cr.prescription,
+          cr.doctor_notes,
+          cr.follow_up_date,
+          cr.created_at,
+          users.name AS doctor_name,
+          users.specialization,
+          users.qualification,
+          users.medical_license,
+          users.hospital,
+          users.experience,
+          patient.name AS patient_name,
+          appointments.appointment_date,
+          appointments.appointment_time,
+          appointments.consultation_mode
+        FROM consultation_records AS cr
+        JOIN users ON cr.doctor_id = users.id
+        JOIN users AS patient ON cr.patient_id = patient.id
+        JOIN appointments ON cr.appointment_id = appointments.id
+        WHERE cr.id = ?`
+      )
+      .get(req.params.id);
+
+    if (!record) {
+      return res.status(404).json({
+        message: "Prescription record not found in clinical database.",
+      });
+    }
+
+    res.json(record);
+  } catch (error) {
+    console.error("Public verify prescription error:", error);
+    res.status(500).json({
+      message: "Failed to verify prescription record.",
+    });
+  }
+});
+
+
+// ========================================
+// GET CONSULTATION RECORD FOR APPOINTMENT
+// GET /api/consultations/appointment/:appointmentId
+// ========================================
+router.get("/appointment/:appointmentId", protect, (req, res) => {
+  try {
+    const record = db
+      .prepare(
+        `SELECT
+          cr.id,
+          cr.appointment_id,
+          cr.doctor_id,
+          cr.patient_id,
+          cr.diagnosis,
+          cr.prescription,
+          cr.doctor_notes,
+          cr.follow_up_date,
+          cr.created_at
+        FROM consultation_records AS cr
+        WHERE cr.appointment_id = ? AND (cr.doctor_id = ? OR cr.patient_id = ?)`
+      )
+      .get(req.params.appointmentId, req.user.id, req.user.id);
+
+    if (!record) {
+      return res.status(404).json({ message: "No consultation record found." });
+    }
+
+    res.json(record);
+  } catch (error) {
+    console.error("Get consultation by appointment error:", error);
+    res.status(500).json({ message: "Failed to load record." });
   }
 });
 

@@ -1,10 +1,11 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const path = require("path");
 const http = require("http");
 const { Server } = require("socket.io");
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, ".env") });
 
 const app = express();
 
@@ -44,7 +45,6 @@ app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/consultations", consultationRoutes);
 app.use("/api/patient", patientRoutes);
 
-const path = require("path");
 const fs = require("fs");
 
 const frontendDist = path.join(__dirname, "../frontend/dist");

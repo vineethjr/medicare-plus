@@ -1,8 +1,10 @@
 
 const Database = require("better-sqlite3");
+const path = require("path");
 
 // Create or connect to the existing SQLite database
-const db = new Database("database.sqlite");
+const dbPath = path.join(__dirname, "database.sqlite");
+const db = new Database(dbPath);
 
 // Enable database settings
 db.pragma("journal_mode = WAL");

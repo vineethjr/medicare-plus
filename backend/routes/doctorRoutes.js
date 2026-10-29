@@ -333,6 +333,72 @@ router.get("/", protect, (req, res) => {
 });
 
 /*
+  Public endpoint: Get verified doctor details by ID (for QR code scanning without auth requirement)
+*/
+router.get("/verify/:id", (req, res) => {
+  try {
+    const doctor = db
+      .prepare(
+        `
+        SELECT
+          id,
+          name,
+          email,
+          specialization,
+          qualification,
+          experience,
+          consultation_fee,
+          hospital,
+          bio,
+          availability,
+          medical_license,
+          verification_status,
+          created_at
+        FROM users
+        WHERE id = ? AND role = 'doctor'
+        `
+      )
+      .get(req.params.id);
+
+    if (!doctor) {
+      return res.status(404).json({
+        message: "Doctor record not found in verified registry",
+      });
+    }
+
+    const documents = db
+      .prepare(
+        `
+        SELECT
+          id,
+          document_name,
+          document_type,
+          issuer,
+          issue_year,
+          status,
+          created_at
+        FROM doctor_documents
+        WHERE doctor_id = ?
+        ORDER BY created_at DESC
+        `
+      )
+      .all(doctor.id);
+
+    res.json({
+      ...doctor,
+      documents: documents || [],
+      verified_at: new Date().toISOString(),
+      registry_seal: `MEDICARE-AUTH-${doctor.id}-${(doctor.medical_license || "REG").replace(/[^a-zA-Z0-9]/g, "")}`,
+    });
+  } catch (error) {
+    console.error("Public verify doctor error:", error.message);
+    res.status(500).json({
+      message: "Failed to verify doctor details",
+    });
+  }
+});
+
+/*
   Get single doctor with verified documents (public for verification)
 */
 router.get("/:id", protect, (req, res) => {
