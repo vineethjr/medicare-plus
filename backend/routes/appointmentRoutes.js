@@ -32,6 +32,28 @@ router.post("/", protect, (req, res) => {
       });
     }
 
+    // Clinical safety check: validate appointment date and time are not in the past
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+    const currentDay = String(now.getDate()).padStart(2, "0");
+    const todayStr = `${currentYear}-${currentMonth}-${currentDay}`;
+    const currentHours = String(now.getHours()).padStart(2, "0");
+    const currentMinutes = String(now.getMinutes()).padStart(2, "0");
+    const currentTimeStr = `${currentHours}:${currentMinutes}`;
+
+    if (appointment_date < todayStr) {
+      return res.status(400).json({
+        message: "Appointment date cannot be in the past.",
+      });
+    }
+
+    if (appointment_date === todayStr && appointment_time <= currentTimeStr) {
+      return res.status(400).json({
+        message: "Appointment time cannot be in the past. Please select an upcoming time slot.",
+      });
+    }
+
     // STRICT CHECK: Verify patient has completed medical profile
     const patientProfile = db.prepare(`
       SELECT age, gender, blood_group, emergency_contact_phone

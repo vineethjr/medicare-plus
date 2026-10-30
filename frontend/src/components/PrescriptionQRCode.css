@@ -1,0 +1,216 @@
+/* PRESCRIPTION QR CODE STYLES */
+.prescription-qr-card {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  background: linear-gradient(135deg, #f0fdfa 0%, #f8fafc 100%);
+  border: 1.5px solid #99f6e4;
+  border-radius: var(--radius-lg, 12px);
+  padding: 16px;
+  margin: 14px 0;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.prescription-qr-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 90px;
+  height: 90px;
+  background: radial-gradient(circle, rgba(20, 184, 166, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.qr-card-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.qr-img-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: white;
+  padding: 8px 8px 6px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.qr-img-frame:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.18);
+  border-color: #0d9488;
+}
+
+.qr-code-img {
+  display: block;
+  border-radius: 4px;
+}
+
+.qr-scan-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  color: #0f766e;
+  background: #ccfbf1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 5px;
+}
+
+.qr-card-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.qr-header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #0d9488;
+  margin-bottom: 4px;
+}
+
+.qr-doctor-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 8px 0;
+}
+
+.qr-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-sm, 6px);
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.qr-meta-item {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+}
+
+.qr-meta-label {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.qr-meta-value {
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qr-instruction-text {
+  font-size: 11px;
+  color: #475569;
+  line-height: 1.4;
+  margin: 0 0 10px 0;
+}
+
+.btn-open-verification {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f766e;
+  background: white;
+  border: 1px solid #99f6e4;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm, 6px);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.btn-open-verification:hover {
+  background: #0d9488;
+  color: white;
+  border-color: #0d9488;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(13, 148, 136, 0.25);
+}
+
+.qr-loading-box,
+.qr-error-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.qr-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #cbd5e1;
+  border-top-color: #0d9488;
+  border-radius: 50%;
+  animation: qr-spin 0.8s linear infinite;
+}
+
+@keyframes qr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.prescription-qr-minimal {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .prescription-qr-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .qr-doctor-name {
+    justify-content: center;
+  }
+
+  .qr-meta-grid {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+
+  .btn-open-verification {
+    align-self: center;
+  }
+}
+

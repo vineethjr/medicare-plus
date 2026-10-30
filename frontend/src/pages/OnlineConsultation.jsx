@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import "./OnlineConsultation.css";
+import PrescriptionQRCode from "../components/PrescriptionQRCode";
 import {
   ActivityIcon,
   AlertCircleIcon,
@@ -721,6 +722,13 @@ function OnlineConsultation() {
       if (res.ok) {
         setPrescriptionSaved(true);
         setExistingPrescription({
+          id: data.consultationId,
+          doctor_id: appointment?.doctor_id || user.id,
+          doctor_name: appointment?.doctor_name || user.name,
+          specialization: appointment?.doctor_specialization || user.specialization,
+          qualification: user.qualification || "MBBS",
+          medical_license: user.medical_license || "SMC-ACTIVE-REGISTRY",
+          hospital: appointment?.doctor_hospital || user.hospital,
           diagnosis: prescriptionForm.diagnosis,
           prescription: JSON.stringify(prescriptionForm.medicines),
           doctor_notes: prescriptionForm.doctor_notes,
@@ -1155,6 +1163,17 @@ function OnlineConsultation() {
                     <div className="rx-badge">
                       <CheckCircleIcon size={16} /> Certified Prescription On File
                     </div>
+
+                    {/* QR CODE FOR DOCTOR & PRESCRIPTION VERIFICATION */}
+                    <PrescriptionQRCode
+                      doctorId={existingPrescription.doctor_id || appointment?.doctor_id || user.id}
+                      doctorName={existingPrescription.doctor_name || appointment?.doctor_name || user.name}
+                      specialization={existingPrescription.specialization || appointment?.doctor_specialization || user.specialization}
+                      qualification={existingPrescription.qualification || user.qualification || "MBBS"}
+                      medicalLicense={existingPrescription.medical_license || user.medical_license || "SMC-ACTIVE-REGISTRY"}
+                      hospital={existingPrescription.hospital || appointment?.doctor_hospital || user.hospital}
+                      prescriptionId={existingPrescription.id}
+                    />
 
                     <div className="rx-item">
                       <small>PRIMARY DIAGNOSIS</small>

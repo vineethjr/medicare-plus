@@ -640,6 +640,15 @@ function DoctorAppointments() {
                     <button
                       type="button"
                       className="complete-btn"
+                      onClick={() => openConsultationForm(appointment)}
+                    >
+                      <FileTextIcon size={16} />
+                      <span>Issue Prescription & Records</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="complete-btn"
                       disabled={updatingId === appointment.id}
                       onClick={() => updateStatus(appointment.id, "Completed")}
                     >

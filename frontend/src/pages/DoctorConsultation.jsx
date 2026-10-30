@@ -1,7 +1,8 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./DoctorConsultation.css";
+import PrescriptionQRCode from "../components/PrescriptionQRCode";
 import {
   CalendarIcon,
   ClockIcon,
@@ -27,12 +28,56 @@ function DoctorConsultation() {
   const [medicines, setMedicines] = useState([createMedicine()]);
   const [doctorNotes, setDoctorNotes] = useState("");
   const [followUpDate, setFollowUpDate] = useState("");
+  const [existingRecordId, setExistingRecordId] = useState(null);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   const token = localStorage.getItem("token");
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  useEffect(() => {
+    async function loadExistingRecord() {
+      if (!appointment?.id || !token) return;
+      try {
+        const res = await fetch(`${API_URL}/consultations/appointment/${appointment.id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data) {
+            setExistingRecordId(data.id);
+            if (data.diagnosis) setDiagnosis(data.diagnosis);
+            if (data.doctor_notes) setDoctorNotes(data.doctor_notes);
+            if (data.follow_up_date) setFollowUpDate(data.follow_up_date);
+            if (data.prescription) {
+              try {
+                const parsed = typeof data.prescription === "string" ? JSON.parse(data.prescription) : data.prescription;
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  setMedicines(parsed.map((m, idx) => ({
+                    id: m.id || idx + 1,
+                    name: m.name || "",
+                    dosage: m.dosage || "",
+                    frequency: m.frequency || "",
+                    duration: m.duration || "",
+                    instructions: m.instructions || "",
+                  })));
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check existing consultation record:", err);
+      }
+    }
+    loadExistingRecord();
+  }, [appointment?.id, token]);
 
   function updateMedicine(id, field, value) {
     setMedicines((current) =>
@@ -218,7 +263,7 @@ function DoctorConsultation() {
                     <PillIcon size={18} /> Prescription
                   </h3>
                   <p>
-                    Add the medicines prescribed for this patient.
+                    Add the medicines prescribed for this patient. A secure QR verification code is automatically generated.
                   </p>
                 </div>
 
@@ -230,6 +275,18 @@ function DoctorConsultation() {
                   + Add Medicine
                 </button>
               </div>
+
+              {/* AUTOMATICALLY GENERATED QR CODE STAMP */}
+              <PrescriptionQRCode
+                doctorId={user.id}
+                doctorName={user.name}
+                specialization={user.specialization}
+                qualification={user.qualification}
+                medicalLicense={user.medical_license}
+                hospital={user.hospital}
+                prescriptionId={existingRecordId}
+                className="doctor-builder-qr-stamp"
+              />
 
               {medicines.map((medicine, index) => (
                 <div className="medicine-card" key={medicine.id}>
@@ -368,7 +425,7 @@ function DoctorConsultation() {
               type="submit"
               disabled={saving}
             >
-              {saving ? "Saving..." : "Save Consultation & Prescription"}
+              {saving ? "Saving..." : existingRecordId ? "Update Consultation & Prescription" : "Save Consultation & Prescription"}
             </button>
           </form>
         </section>

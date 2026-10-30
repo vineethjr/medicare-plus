@@ -9,9 +9,9 @@ import {
   BoneIcon,
   BrainIcon,
   CheckCircleIcon,
+  ClockIcon,
   DoctorIcon,
   EyeIcon,
-  FileTextIcon,
   HeartPulseIcon,
   HospitalIcon,
   PillIcon,
@@ -24,6 +24,57 @@ import {
   XIcon,
 } from "../components/Icons";
 import { API_URL } from "../config";
+
+function getLocalDateString(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getLocalTimeString(date = new Date()) {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function formatTime12Hour(time24) {
+  if (!time24) return "";
+  const [hStr, mStr] = time24.split(":");
+  const h = parseInt(hStr, 10);
+  if (isNaN(h)) return time24;
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${String(h12).padStart(2, "0")}:${mStr} ${ampm}`;
+}
+
+const ALL_TIME_SLOTS = [
+  { label: "08:30 AM", val: "08:30" },
+  { label: "09:00 AM", val: "09:00" },
+  { label: "09:30 AM", val: "09:30" },
+  { label: "10:00 AM", val: "10:00" },
+  { label: "10:30 AM", val: "10:30" },
+  { label: "11:00 AM", val: "11:00" },
+  { label: "11:30 AM", val: "11:30" },
+  { label: "12:00 PM", val: "12:00" },
+  { label: "12:30 PM", val: "12:30" },
+  { label: "01:00 PM", val: "13:00" },
+  { label: "01:30 PM", val: "13:30" },
+  { label: "02:00 PM", val: "14:00" },
+  { label: "02:30 PM", val: "14:30" },
+  { label: "03:00 PM", val: "15:00" },
+  { label: "03:30 PM", val: "15:30" },
+  { label: "04:00 PM", val: "16:00" },
+  { label: "04:30 PM", val: "16:30" },
+  { label: "05:00 PM", val: "17:00" },
+  { label: "05:30 PM", val: "17:30" },
+  { label: "06:00 PM", val: "18:00" },
+  { label: "06:30 PM", val: "18:30" },
+  { label: "07:00 PM", val: "19:00" },
+  { label: "07:30 PM", val: "19:30" },
+  { label: "08:00 PM", val: "20:00" },
+  { label: "08:30 PM", val: "20:30" },
+];
 
 function FindDoctor() {
   const navigate = useNavigate();
@@ -53,6 +104,9 @@ function FindDoctor() {
   // Consultation mode
   const [consultationMode, setConsultationMode] = useState("Online");
 
+  const [currentTimeObj, setCurrentTimeObj] = useState(new Date());
+  const [timeError, setTimeError] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState("");
@@ -60,6 +114,45 @@ function FindDoctor() {
 
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  // Automatically update clock every 10 seconds to keep available slots synchronized
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      setCurrentTimeObj(now);
+      const curToday = getLocalDateString(now);
+      const curTime = getLocalTimeString(now);
+
+      setAppointmentTime((prevTime) => {
+        if (prevTime && appointmentDate === curToday && prevTime <= curTime) {
+          setTimeError(
+            `Selected slot has passed (current time: ${formatTime12Hour(curTime)}). Please select an upcoming slot.`
+          );
+          return "";
+        }
+        return prevTime;
+      });
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [appointmentDate]);
+
+  const todayStr = getLocalDateString(currentTimeObj);
+  const currentTimeStr = getLocalTimeString(currentTimeObj);
+  const isSelectedDateToday = appointmentDate === todayStr;
+  const isSelectedDatePast = appointmentDate && appointmentDate < todayStr;
+
+  // Filter available slots:
+  // For today: hide all slots earlier than current time (<= currentTimeStr)
+  // For future dates: display all slots
+  // For past dates: display no slots
+  const availableTimeSlots = ALL_TIME_SLOTS.filter((slot) => {
+    if (!appointmentDate) return true;
+    if (isSelectedDatePast) return false;
+    if (isSelectedDateToday) {
+      return slot.val > currentTimeStr;
+    }
+    return true;
+  });
 
   // Fetch doctors
   useEffect(() => {
@@ -212,12 +305,26 @@ function FindDoctor() {
       return;
     }
     setSelectedDoctor(doctor);
-    setAppointmentDate("");
+
+    const now = new Date();
+    const currentToday = getLocalDateString(now);
+    const currentNowTime = getLocalTimeString(now);
+    const hasRemainingToday = ALL_TIME_SLOTS.some((s) => s.val > currentNowTime);
+
+    if (hasRemainingToday) {
+      setAppointmentDate(currentToday);
+    } else {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setAppointmentDate(getLocalDateString(tomorrow));
+    }
+
     setAppointmentTime("");
     setSymptoms("");
     setConsultationMode("Online");
     setError("");
     setSuccess("");
+    setTimeError("");
   }
 
   // Close booking form
@@ -226,6 +333,7 @@ function FindDoctor() {
       setSelectedDoctor(null);
       setError("");
       setSuccess("");
+      setTimeError("");
     }
   }
 
@@ -238,9 +346,27 @@ function FindDoctor() {
       return;
     }
 
+    const now = new Date();
+    const currentToday = getLocalDateString(now);
+    const currentNowTime = getLocalTimeString(now);
+
+    if (appointmentDate < currentToday) {
+      setError("Appointment date cannot be in the past. Please select today or a future date.");
+      return;
+    }
+
+    if (appointmentDate === currentToday && appointmentTime <= currentNowTime) {
+      const errorMsg = `Selected appointment time (${formatTime12Hour(appointmentTime)}) has already passed. Current time is ${formatTime12Hour(currentNowTime)}. Please select an upcoming slot.`;
+      setError(errorMsg);
+      setTimeError(errorMsg);
+      setAppointmentTime("");
+      return;
+    }
+
     try {
       setBooking(true);
       setError("");
+      setTimeError("");
       setSuccess("");
 
       const response = await fetch(`${API_URL}/appointments`, {
@@ -550,7 +676,7 @@ function FindDoctor() {
             <button
               className="close-modal-btn"
               onClick={closeBookingForm}
-              disabled={booking}
+              disabled={booking || (isSelectedDateToday && appointmentTime && appointmentTime <= currentTimeStr)}
             >
               <XIcon size={18} />
             </button>
@@ -609,13 +735,22 @@ function FindDoctor() {
                   ].map((d) => {
                     const target = new Date();
                     target.setDate(target.getDate() + d.days);
-                    const iso = target.toISOString().split("T")[0];
+                    const iso = getLocalDateString(target);
                     return (
                       <button
                         key={d.label}
                         type="button"
                         className={`quick-slot-btn ${appointmentDate === iso ? "active" : ""}`}
-                        onClick={() => setAppointmentDate(iso)}
+                        onClick={() => {
+                          setAppointmentDate(iso);
+                          setTimeError("");
+                          if (iso === todayStr && appointmentTime && appointmentTime <= currentTimeStr) {
+                            setAppointmentTime("");
+                            setTimeError(
+                              `Selected time slot was earlier than the current time (${formatTime12Hour(currentTimeStr)}). Please pick an upcoming slot.`
+                            );
+                          }
+                        }}
                       >
                         {d.label} ({iso.slice(5)})
                       </button>
@@ -625,40 +760,120 @@ function FindDoctor() {
                 <input
                   id="appointment-date"
                   type="date"
-                  min={new Date().toISOString().split("T")[0]}
+                  min={todayStr}
                   value={appointmentDate}
-                  onChange={(e) => setAppointmentDate(e.target.value)}
+                  onChange={(e) => {
+                    const chosenDate = e.target.value;
+                    setAppointmentDate(chosenDate);
+                    setTimeError("");
+                    if (chosenDate === todayStr && appointmentTime && appointmentTime <= currentTimeStr) {
+                      setAppointmentTime("");
+                      setTimeError(
+                        `Selected time slot was earlier than current time (${formatTime12Hour(currentTimeStr)}). Please pick an upcoming slot.`
+                      );
+                    }
+                  }}
                   required
                 />
               </div>
 
-              <div>
-                <label htmlFor="appointment-time">Select Time Slot</label>
-                <div className="quick-times-row">
-                  {[
-                    { label: "10:00 AM", val: "10:00" },
-                    { label: "11:30 AM", val: "11:30" },
-                    { label: "02:30 PM", val: "14:30" },
-                    { label: "04:30 PM", val: "16:30" },
-                    { label: "06:30 PM", val: "18:30" },
-                  ].map((t) => (
-                    <button
-                      key={t.val}
-                      type="button"
-                      className={`quick-slot-btn ${appointmentTime === t.val ? "active" : ""}`}
-                      onClick={() => setAppointmentTime(t.val)}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
+              <div className="time-slot-selector-section">
+                <div className="slot-section-header">
+                  <label htmlFor="appointment-time">Select Time Slot</label>
+                  {isSelectedDateToday && (
+                    <span className="live-time-indicator">
+                      <ClockIcon size={13} />
+                      <span>
+                        Current Time: <strong>{formatTime12Hour(currentTimeStr)}</strong> (showing upcoming slots only)
+                      </span>
+                    </span>
+                  )}
+                  {!isSelectedDateToday && appointmentDate && (
+                    <span className="all-slots-indicator">
+                      All slots available for selected date
+                    </span>
+                  )}
                 </div>
-                <input
-                  id="appointment-time"
-                  type="time"
-                  value={appointmentTime}
-                  onChange={(e) => setAppointmentTime(e.target.value)}
-                  required
-                />
+
+                {isSelectedDatePast && (
+                  <div className="slot-warning-notice">
+                    <AlertCircleIcon size={15} />
+                    <span>Selected date is in the past. Please select today or a future date.</span>
+                  </div>
+                )}
+
+                {isSelectedDateToday && availableTimeSlots.length === 0 && (
+                  <div className="no-slots-notice">
+                    <ClockIcon size={20} />
+                    <div>
+                      <strong>No more consultation slots available for today</strong>
+                      <p>
+                        All scheduled slots for today have passed (current time: ${formatTime12Hour(currentTimeStr)}). Please select tomorrow or another future date.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-switch-date"
+                      onClick={() => {
+                        const tomorrow = new Date();
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        setAppointmentDate(getLocalDateString(tomorrow));
+                        setTimeError("");
+                      }}
+                    >
+                      Book for Tomorrow →
+                    </button>
+                  </div>
+                )}
+
+                {availableTimeSlots.length > 0 && (
+                  <div className="quick-times-grid">
+                    {availableTimeSlots.map((t) => (
+                      <button
+                        key={t.val}
+                        type="button"
+                        className={`quick-slot-btn ${appointmentTime === t.val ? "active" : ""}`}
+                        onClick={() => {
+                          setAppointmentTime(t.val);
+                          setTimeError("");
+                        }}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="custom-time-input-row">
+                  <label htmlFor="appointment-time" className="custom-time-label">
+                    Or select exact time:
+                  </label>
+                  <input
+                    id="appointment-time"
+                    type="time"
+                    min={isSelectedDateToday ? currentTimeStr : undefined}
+                    value={appointmentTime}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAppointmentTime(val);
+                      if (isSelectedDateToday && val && val <= currentTimeStr) {
+                        setTimeError(
+                          `Selected time (${formatTime12Hour(val)}) has already passed for today. Please select a time after ${formatTime12Hour(currentTimeStr)}.`
+                        );
+                      } else {
+                        setTimeError("");
+                      }
+                    }}
+                    required
+                  />
+                </div>
+
+                {timeError && (
+                  <div className="time-error-message">
+                    <AlertCircleIcon size={14} />
+                    <span>{timeError}</span>
+                  </div>
+                )}
               </div>
 
               <div>
