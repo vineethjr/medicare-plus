@@ -62,59 +62,163 @@ function readUser() {
 
 
 /**
- * Creates a valid MediaStream fallback with a cyber-clinical canvas avatar track
- * and silent Web Audio track so WebRTC P2P negotiation can always succeed
- * even if camera is locked by another window or temporarily unavailable.
+ * Creates an ultra-reliable, animated 30 FPS MediaStream with a cyber-clinical
+ * avatar, pulsing telemetry waves, live ECG heartbeat line, and live digital clock.
+ * This guarantees that Chromium's captureStream() produces continuous video frames
+ * and WebRTC P2P video packets are actively transmitted without ever going black.
  */
-function createFallbackStream(userName) {
+function createFallbackStream(userName, roleTitle) {
   const canvas = document.createElement("canvas");
   canvas.width = 640;
   canvas.height = 480;
   const ctx = canvas.getContext("2d");
 
-  function renderAvatar() {
-    ctx.fillStyle = "#071217";
+  let frameCount = 0;
+  const isDoc = roleTitle ? String(roleTitle).toLowerCase().includes("doc") : false;
+
+  function drawFrame() {
+    frameCount++;
+
+    // 1. Dark cyber-clinical backdrop
+    ctx.fillStyle = "#030a0d";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Glowing circle
+    // 2. Futuristic medical telemetry grid
+    ctx.strokeStyle = "rgba(45, 212, 191, 0.06)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 32) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 32) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
+    // 3. Animated pulsing radar rings radiating from avatar center (320, 190)
+    const pulse1 = (frameCount * 1.5) % 90;
+    const pulse2 = (frameCount * 1.5 + 45) % 90;
     ctx.beginPath();
-    ctx.arc(320, 220, 85, 0, Math.PI * 2);
-    ctx.fillStyle = "#0e2933";
-    ctx.fill();
+    ctx.arc(320, 190, 65 + pulse1, 0, Math.PI * 2);
+    ctx.strokeStyle = isDoc
+      ? `rgba(45, 212, 191, ${Math.max(0, 0.4 - pulse1 / 90)})`
+      : `rgba(56, 189, 248, ${Math.max(0, 0.4 - pulse1 / 90)})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc(320, 220, 68, 0, Math.PI * 2);
-    ctx.fillStyle = "#0d9488";
-    ctx.fill();
+    ctx.arc(320, 190, 65 + pulse2, 0, Math.PI * 2);
+    ctx.strokeStyle = isDoc
+      ? `rgba(45, 212, 191, ${Math.max(0, 0.4 - pulse2 / 90)})`
+      : `rgba(56, 189, 248, ${Math.max(0, 0.4 - pulse2 / 90)})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-    // Initial
-    const initial = (userName || "P").charAt(0).toUpperCase();
+    // 4. Avatar circle background & glowing border
+    ctx.beginPath();
+    ctx.arc(320, 190, 65, 0, Math.PI * 2);
+    ctx.fillStyle = isDoc ? "#09252c" : "#092033";
+    ctx.fill();
+    ctx.strokeStyle = isDoc ? "#2dd4bf" : "#38bdf8";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // 5. User Initial letter
+    const initial = (userName || (isDoc ? "D" : "P")).charAt(0).toUpperCase();
     ctx.font = "bold 52px system-ui, -apple-system, sans-serif";
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(initial, 320, 220);
+    ctx.fillText(initial, 320, 188);
 
-    // Name & status
-    ctx.font = "600 16px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = "#2dd4bf";
-    ctx.fillText(userName || "Participant", 320, 335);
+    // 6. Online Green Pulse Dot
+    const dotGlow = Math.abs(Math.sin(frameCount * 0.08)) * 3;
+    ctx.beginPath();
+    ctx.arc(366, 235, 8 + dotGlow, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(16, 185, 129, 0.35)";
+    ctx.fill();
 
-    ctx.font = "400 13px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = "#64748b";
-    ctx.fillText("Audio-Only / Avatar Mode Active", 320, 360);
+    ctx.beginPath();
+    ctx.arc(366, 235, 7, 0, Math.PI * 2);
+    ctx.fillStyle = "#10b981";
+    ctx.fill();
+    ctx.strokeStyle = "#030a0d";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 7. Participant Name
+    ctx.font = "bold 19px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillText(userName || (isDoc ? "Attending Physician" : "Consultation Patient"), 320, 285);
+
+    // 8. Role Subtitle
+    ctx.font = "600 12.5px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = isDoc ? "#2dd4bf" : "#38bdf8";
+    ctx.fillText(
+      isDoc ? "PHYSICIAN • ENCRYPTED CLINICAL TELEHEALTH" : "PATIENT • LIVE SECURE CONSULTATION",
+      320,
+      308
+    );
+
+    // 9. Live moving ECG / Heartbeat waveform
+    ctx.strokeStyle = isDoc ? "#2dd4bf" : "#38bdf8";
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    const ecgY = 385;
+    const speedOffset = (frameCount * 4) % canvas.width;
+    for (let x = 0; x < canvas.width; x += 4) {
+      const relX = (x + speedOffset) % canvas.width;
+      let y = ecgY;
+      if (relX >= 270 && relX < 282) {
+        y = ecgY - 6;
+      } else if (relX >= 282 && relX < 296) {
+        y = ecgY + 28;
+      } else if (relX >= 296 && relX < 312) {
+        y = ecgY - 38; // high R-wave peak
+      } else if (relX >= 312 && relX < 326) {
+        y = ecgY + 14;
+      } else if (relX >= 326 && relX < 340) {
+        y = ecgY - 8;
+      }
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // 10. Live telemetry stats footer
+    const now = new Date();
+    const timeStr = now.toTimeString().split(" ")[0];
+    ctx.font = "500 11.5px monospace";
+    ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
+    ctx.fillText(
+      `MEDICARE+ SECURE WEBRTC • 30 FPS LIVE • ${timeStr}`,
+      320,
+      445
+    );
   }
 
-  renderAvatar();
+  // Draw first frame immediately
+  drawFrame();
+
+  // Continuously paint the canvas at 30 FPS so Chromium continuously streams video frames
+  const intervalId = setInterval(drawFrame, 1000 / 30);
+
   let videoTrack = null;
   try {
-    const stream = canvas.captureStream ? canvas.captureStream(10) : null;
+    const stream = canvas.captureStream ? canvas.captureStream(30) : null;
     if (stream) {
       videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) videoTrack._isVirtual = true;
+      if (videoTrack) {
+        videoTrack._isVirtual = true;
+        videoTrack.addEventListener("ended", () => clearInterval(intervalId));
+      }
     }
   } catch (err) {
-    console.warn("Could not capture canvas stream:", err);
+    console.warn("Could not capture animated canvas stream:", err);
   }
 
   // Silent audio track using AudioContext
@@ -140,7 +244,9 @@ function createFallbackStream(userName) {
   const tracks = [];
   if (videoTrack) tracks.push(videoTrack);
   if (audioTrack) tracks.push(audioTrack);
-  return new MediaStream(tracks);
+  const mediaStream = new MediaStream(tracks);
+  mediaStream._animationInterval = intervalId;
+  return mediaStream;
 }
 
 function OnlineConsultation() {
@@ -158,6 +264,7 @@ function OnlineConsultation() {
   const [participantConnected, setParticipantConnected] = useState(false);
   const [participantCount, setParticipantCount] = useState(1);
   const [signalingStatus, setSignalingStatus] = useState("waiting");
+  const [useVirtualStream, setUseVirtualStream] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
 
   // Active drawer tab: null (closed), 'dossier', 'prescription', 'chat'
@@ -187,6 +294,7 @@ function OnlineConsultation() {
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteStreamRef = useRef(null);
   const localStreamRef = useRef(null);
   const screenStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
@@ -393,19 +501,26 @@ function OnlineConsultation() {
 
     // Remote track reception
     pc.ontrack = (event) => {
-      console.log("WebRTC Remote track received:", event.track.kind);
-      const incomingStream = (event.streams && event.streams[0])
-        ? event.streams[0]
-        : new MediaStream([event.track]);
+      console.log("WebRTC Remote track received:", event.track.kind, event.track.id);
 
+      if (!remoteStreamRef.current) {
+        remoteStreamRef.current = new MediaStream();
+      }
+
+      // If a track of this kind already exists, remove it first
+      const existing = remoteStreamRef.current.getTracks().filter((t) => t.kind === event.track.kind);
+      existing.forEach((t) => remoteStreamRef.current.removeTrack(t));
+
+      // Add the new incoming track
+      remoteStreamRef.current.addTrack(event.track);
+
+      // Re-assign srcObject to force HTMLMediaElement to start rendering the video track
       if (remoteVideoRef.current) {
-        if (remoteVideoRef.current.srcObject !== incomingStream) {
-          remoteVideoRef.current.srcObject = incomingStream;
-        }
+        remoteVideoRef.current.srcObject = remoteStreamRef.current;
         const playPromise = remoteVideoRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch((err) => {
-            console.warn("Remote autoplay restricted by browser policy; trying muted:", err);
+            console.warn("Autoplay note - trying muted:", err);
             if (remoteVideoRef.current) {
               remoteVideoRef.current.muted = true;
               remoteVideoRef.current.play().catch(() => {});
@@ -413,6 +528,14 @@ function OnlineConsultation() {
           });
         }
       }
+
+      event.track.onunmute = () => {
+        console.log("Remote track unmuted and streaming:", event.track.kind);
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.play().catch(() => {});
+        }
+      };
+
       setParticipantConnected(true);
       setSignalingStatus("connected");
     };
@@ -640,28 +763,31 @@ function OnlineConsultation() {
       });
       setCameraOn(true);
       setMicOn(true);
+      setUseVirtualStream(false);
       console.log("Acquired real hardware camera & microphone");
     } catch (err1) {
-      console.warn("Full camera+audio capture failed, trying audio-only fallback:", err1.message);
+      console.warn("Full camera+audio capture failed, using animated clinical stream:", err1.message);
 
-      // 2. Try real audio only + fallback virtual avatar video
+      // 2. Try real audio only + 30 FPS animated cyber clinical stream
       try {
         const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const fallback = createFallbackStream(user.name || (isDoctor ? "Doctor" : "Patient"));
+        const fallback = createFallbackStream(user.name || (isDoctor ? "Doctor" : "Patient"), isDoctor ? "doctor" : "patient");
         const tracks = [...audioStream.getAudioTracks(), ...fallback.getVideoTracks()];
         stream = new MediaStream(tracks);
-        setCameraOn(false);
+        setCameraOn(true);
         setMicOn(true);
-        setMediaError("Camera is busy in another window or denied. Audio is live (Avatar mode). Click 'Start Cam' to retry.");
-        console.log("Acquired real microphone with avatar video stream");
+        setUseVirtualStream(true);
+        setMediaError("Webcam busy or in use. Active in Cyber Clinical Stream mode with real microphone audio.");
+        console.log("Acquired real microphone with animated cyber clinical stream");
       } catch (err2) {
-        console.warn("Audio-only capture also failed, using full clinical virtual fallback:", err2.message);
+        console.warn("Audio-only capture also failed, using full virtual clinical stream:", err2.message);
 
-        // 3. Fallback: virtual avatar video + silent audio so WebRTC connection never fails
-        stream = createFallbackStream(user.name || (isDoctor ? "Doctor" : "Patient"));
-        setCameraOn(false);
+        // 3. Fallback: 30 FPS animated cyber stream + silent audio
+        stream = createFallbackStream(user.name || (isDoctor ? "Doctor" : "Patient"), isDoctor ? "doctor" : "patient");
+        setCameraOn(true);
         setMicOn(false);
-        setMediaError("Camera & microphone unavailable or in use by another window. Connected in avatar mode. Click 'Start Cam' or 'Unmute' to enable.");
+        setUseVirtualStream(true);
+        setMediaError("Connected in Cyber Clinical Stream mode. Click 'Hardware Cam' or 'Unmute' to enable devices.");
       }
     }
 
@@ -691,8 +817,52 @@ function OnlineConsultation() {
     return stream;
   }
 
+  // Switch to animated Cyber Clinical Stream (30 FPS)
+  async function switchToCyberStream() {
+    try {
+      const fallback = createFallbackStream(
+        user.name || (isDoctor ? "Doctor" : "Patient"),
+        isDoctor ? "doctor" : "patient"
+      );
+      const newVideoTrack = fallback.getVideoTracks()[0];
+      if (!newVideoTrack) return;
+
+      if (localStreamRef.current) {
+        const oldTrack = localStreamRef.current.getVideoTracks()[0];
+        if (oldTrack) {
+          oldTrack.stop();
+          localStreamRef.current.removeTrack(oldTrack);
+        }
+        localStreamRef.current.addTrack(newVideoTrack);
+      }
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+        localVideoRef.current.play().catch(() => {});
+      }
+
+      if (peerConnectionRef.current) {
+        const sender = peerConnectionRef.current
+          .getSenders()
+          .find((s) => s.track && s.track.kind === "video");
+        if (sender) {
+          await sender.replaceTrack(newVideoTrack);
+        } else if (localStreamRef.current) {
+          peerConnectionRef.current.addTrack(newVideoTrack, localStreamRef.current);
+        }
+      }
+
+      setCameraOn(true);
+      setUseVirtualStream(true);
+      setMediaError("");
+      console.log("Switched to animated Cyber Clinical Stream");
+    } catch (err) {
+      console.error("Error switching to cyber stream:", err);
+    }
+  }
+
   // Hot-swap hardware camera into ongoing call
-  async function requestCameraAccess() {
+  async function switchToHardwareCamera() {
     try {
       setMediaError("");
       const newStream = await navigator.mediaDevices.getUserMedia({
@@ -716,7 +886,9 @@ function OnlineConsultation() {
       }
 
       if (peerConnectionRef.current) {
-        const sender = peerConnectionRef.current.getSenders().find((s) => s.track && s.track.kind === "video");
+        const sender = peerConnectionRef.current
+          .getSenders()
+          .find((s) => s.track && s.track.kind === "video");
         if (sender) {
           await sender.replaceTrack(newVideoTrack);
         } else if (localStreamRef.current) {
@@ -725,10 +897,20 @@ function OnlineConsultation() {
       }
 
       setCameraOn(true);
+      setUseVirtualStream(false);
       setMediaError("");
       console.log("Hardware camera activated and hot-swapped into consultation");
     } catch (err) {
-      setMediaError("Could not start camera: " + (err.message || "Device busy or permission denied"));
+      setMediaError("Could not start hardware camera: " + (err.message || "Device busy"));
+      switchToCyberStream();
+    }
+  }
+
+  function toggleStreamMode() {
+    if (useVirtualStream) {
+      switchToHardwareCamera();
+    } else {
+      switchToCyberStream();
     }
   }
 
@@ -750,7 +932,9 @@ function OnlineConsultation() {
       }
 
       if (peerConnectionRef.current) {
-        const sender = peerConnectionRef.current.getSenders().find((s) => s.track && s.track.kind === "audio");
+        const sender = peerConnectionRef.current
+          .getSenders()
+          .find((s) => s.track && s.track.kind === "audio");
         if (sender) {
           await sender.replaceTrack(newAudioTrack);
         } else if (localStreamRef.current) {
@@ -960,12 +1144,12 @@ function OnlineConsultation() {
 
   function toggleCamera() {
     if (!localStreamRef.current) {
-      requestCameraAccess();
+      switchToHardwareCamera();
       return;
     }
     const videoTrack = localStreamRef.current.getVideoTracks()[0];
-    if (!videoTrack || videoTrack._isVirtual) {
-      requestCameraAccess();
+    if (!videoTrack) {
+      switchToHardwareCamera();
       return;
     }
     videoTrack.enabled = !videoTrack.enabled;
@@ -1302,7 +1486,26 @@ function OnlineConsultation() {
             )}
 
             <div className="pip-status-overlay">
-              <span className="pip-self-label">You (Self View)</span>
+              <span className="pip-self-label">You ({useVirtualStream ? "Cyber Stream" : "Hardware Cam"})</span>
+              <button
+                type="button"
+                onClick={toggleStreamMode}
+                title="Switch between Hardware Camera and Cyber Clinical Live Stream"
+                style={{
+                  background: "rgba(15, 23, 42, 0.9)",
+                  border: "1px solid rgba(45, 212, 191, 0.45)",
+                  borderRadius: "4px",
+                  color: "#2dd4bf",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  padding: "2px 6px",
+                  cursor: "pointer",
+                  marginLeft: "auto",
+                  pointerEvents: "auto",
+                }}
+              >
+                {useVirtualStream ? "📷 Hardware Cam" : "✨ Cyber Stream"}
+              </button>
               <span className={`pip-mic-dot ${micOn ? "active" : "muted"}`}>
                 {micOn ? "Mic On" : "Muted"}
               </span>
@@ -1357,6 +1560,17 @@ function OnlineConsultation() {
             >
               <VideoIcon size={18} />
               <span>{cameraOn ? "Stop Cam" : "Start Cam"}</span>
+            </button>
+
+            {/* STREAM MODE TOGGLE */}
+            <button
+              type="button"
+              className={`dock-btn ${useVirtualStream ? "active-tab" : ""}`}
+              onClick={toggleStreamMode}
+              title={useVirtualStream ? "Switch to Hardware Webcam" : "Switch to Cyber Clinical Live Stream"}
+            >
+              <SparklesIcon size={18} />
+              <span>{useVirtualStream ? "Cyber Stream" : "Hardware Cam"}</span>
             </button>
 
             {/* SCREEN SHARE */}
