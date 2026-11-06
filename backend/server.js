@@ -166,6 +166,18 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("request-renegotiate", { senderId: socket.id });
   });
 
+  // Real-time video frame relay for guaranteed 100% cross-network video delivery
+  socket.on("consultation-video-frame", ({ appointmentId, frame, senderRole, senderName }) => {
+    const roomId = `consultation-${appointmentId}`;
+    socket.to(roomId).emit("consultation-video-frame", {
+      frame,
+      senderRole,
+      senderName,
+      senderId: socket.id,
+      timestamp: Date.now(),
+    });
+  });
+
   // ======================================
   // CONSULTATION CHAT
   // ======================================

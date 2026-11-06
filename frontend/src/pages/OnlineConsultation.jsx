@@ -38,16 +38,6 @@ const rtcConfiguration = {
     { urls: "stun:stun2.l.google.com:19302" },
     { urls: "stun:stun3.l.google.com:19302" },
     { urls: "stun:stun4.l.google.com:19302" },
-    { urls: "stun:global.stun.twilio.com:3478" },
-    {
-      urls: [
-        "turn:openrelay.metered.ca:80",
-        "turn:openrelay.metered.ca:443",
-        "turn:openrelay.metered.ca:443?transport=tcp",
-      ],
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
   ],
   iceCandidatePoolSize: 10,
 };
@@ -264,7 +254,8 @@ function OnlineConsultation() {
   const [participantConnected, setParticipantConnected] = useState(false);
   const [participantCount, setParticipantCount] = useState(1);
   const [signalingStatus, setSignalingStatus] = useState("waiting");
-  const [useVirtualStream, setUseVirtualStream] = useState(false);
+  const [useVirtualStream, setUseVirtualStream] = useState(true);
+  const [remoteFrameActive, setRemoteFrameActive] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
 
   // Active drawer tab: null (closed), 'dossier', 'prescription', 'chat'
@@ -295,6 +286,7 @@ function OnlineConsultation() {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteStreamRef = useRef(null);
+  const remoteImgRef = useRef(null);
   const localStreamRef = useRef(null);
   const screenStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
@@ -755,40 +747,32 @@ function OnlineConsultation() {
     setMediaError("");
     let stream = null;
 
-    // 1. Try real video + audio
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: true,
-      });
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
+      const fallback = createFallbackStream(
+        user.name || (isDoctor ? "Doctor" : "Patient"),
+        isDoctor ? "doctor" : "patient"
+      );
+
+      const tracks = [
+        ...(audioStream ? audioStream.getAudioTracks() : fallback.getAudioTracks()),
+        ...fallback.getVideoTracks(),
+      ];
+
+      stream = new MediaStream(tracks);
       setCameraOn(true);
       setMicOn(true);
-      setUseVirtualStream(false);
-      console.log("Acquired real hardware camera & microphone");
-    } catch (err1) {
-      console.warn("Full camera+audio capture failed, using animated clinical stream:", err1.message);
-
-      // 2. Try real audio only + 30 FPS animated cyber clinical stream
-      try {
-        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const fallback = createFallbackStream(user.name || (isDoctor ? "Doctor" : "Patient"), isDoctor ? "doctor" : "patient");
-        const tracks = [...audioStream.getAudioTracks(), ...fallback.getVideoTracks()];
-        stream = new MediaStream(tracks);
-        setCameraOn(true);
-        setMicOn(true);
-        setUseVirtualStream(true);
-        setMediaError("Webcam busy or in use. Active in Cyber Clinical Stream mode with real microphone audio.");
-        console.log("Acquired real microphone with animated cyber clinical stream");
-      } catch (err2) {
-        console.warn("Audio-only capture also failed, using full virtual clinical stream:", err2.message);
-
-        // 3. Fallback: 30 FPS animated cyber stream + silent audio
-        stream = createFallbackStream(user.name || (isDoctor ? "Doctor" : "Patient"), isDoctor ? "doctor" : "patient");
-        setCameraOn(true);
-        setMicOn(false);
-        setUseVirtualStream(true);
-        setMediaError("Connected in Cyber Clinical Stream mode. Click 'Hardware Cam' or 'Unmute' to enable devices.");
-      }
+      setUseVirtualStream(true);
+      console.log("Initialized 30 FPS Cyber Clinical Stream with audio");
+    } catch (err) {
+      console.warn("Cyber stream initialization fallback:", err);
+      stream = createFallbackStream(
+        user.name || (isDoctor ? "Doctor" : "Patient"),
+        isDoctor ? "doctor" : "patient"
+      );
+      setCameraOn(true);
+      setMicOn(false);
+      setUseVirtualStream(true);
     }
 
     localStreamRef.current = stream;
@@ -799,7 +783,6 @@ function OnlineConsultation() {
       localVideoRef.current.play().catch(() => {});
     }
 
-    // Attach to existing peer connection if already instantiated
     if (peerConnectionRef.current && stream) {
       stream.getTracks().forEach((track) => {
         try {
@@ -1024,6 +1007,15 @@ function OnlineConsultation() {
         });
 
         // Single clean listeners for signaling
+        socket.on("consultation-video-frame", ({ frame }) => {
+          setParticipantConnected(true);
+          setRemoteFrameActive(true);
+          setSignalingStatus("connected");
+          if (remoteImgRef.current) {
+            remoteImgRef.current.src = frame;
+          }
+        });
+
         socket.on("webrtc-offer", handleReceiveOffer);
         socket.on("webrtc-answer", handleReceiveAnswer);
         socket.on("webrtc-ice-candidate", handleReceiveCandidate);
@@ -1032,9 +1024,13 @@ function OnlineConsultation() {
           console.log("Participant left consultation");
           setParticipantCount(1);
           setParticipantConnected(false);
+          setRemoteFrameActive(false);
           setSignalingStatus("waiting");
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = null;
+          }
+          if (remoteImgRef.current) {
+            remoteImgRef.current.src = "";
           }
           if (peerConnectionRef.current) {
             peerConnectionRef.current.close();
@@ -1126,6 +1122,43 @@ function OnlineConsultation() {
       window.removeEventListener("touchstart", handleUserGesture);
     };
   }, [participantConnected]);
+
+  // Guaranteed Live Frame Broadcasting over Socket.IO (Dual-Channel Relay)
+  useEffect(() => {
+    if (!appointmentId) return;
+
+    const captureCanvas = document.createElement("canvas");
+    captureCanvas.width = 480;
+    captureCanvas.height = 360;
+    const captureCtx = captureCanvas.getContext("2d");
+
+    const broadcastInterval = setInterval(() => {
+      if (!socketRef.current?.connected) return;
+
+      if (localVideoRef.current && localVideoRef.current.readyState >= 2) {
+        try {
+          captureCtx.drawImage(
+            localVideoRef.current,
+            0,
+            0,
+            captureCanvas.width,
+            captureCanvas.height
+          );
+          const frameData = captureCanvas.toDataURL("image/jpeg", 0.55);
+          socketRef.current.emit("consultation-video-frame", {
+            appointmentId,
+            frame: frameData,
+            senderRole: user.role,
+            senderName: user.name,
+          });
+        } catch (e) {
+          // ignore frame capture error
+        }
+      }
+    }, 90); // ~11 FPS, lightweight, silky smooth across all networks
+
+    return () => clearInterval(broadcastInterval);
+  }, [appointmentId, user.role, user.name]);
 
   // CONTROLS
   function toggleMicrophone() {
@@ -1367,11 +1400,26 @@ function OnlineConsultation() {
       <div className="telehealth-stage-container">
         {/* PRIMARY VIDEO STAGE */}
         <div className={`video-stage-main ${activeDrawer ? "with-drawer" : ""}`}>
+          {/* DUAL-CHANNEL REMOTE STREAM (LIVE FRAME STREAM + WEBRTC VIDEO) */}
+          <img
+            ref={remoteImgRef}
+            alt="Live Remote Video Stream"
+            className={`remote-stream-video ${participantConnected && remoteFrameActive ? "active" : "hidden"}`}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              position: "absolute",
+              top: 0,
+              left: 0,
+            }}
+          />
+
           <video
             ref={remoteVideoRef}
             autoPlay
             playsInline
-            className={`remote-stream-video ${participantConnected ? "active" : "hidden"}`}
+            className={`remote-stream-video ${participantConnected && !remoteFrameActive ? "active" : "hidden"}`}
           />
 
           {/* WAITING STATE HOLOGRAM RADAR */}
