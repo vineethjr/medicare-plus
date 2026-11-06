@@ -166,6 +166,12 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("request-renegotiate", { senderId: socket.id });
   });
 
+  // Zero-lag real-time video frame relay with timestamp for stale frame purge
+  socket.on("live-frame", ({ appointmentId, frame, timestamp }) => {
+    const roomId = `consultation-${appointmentId}`;
+    socket.to(roomId).emit("live-frame", { frame, timestamp, senderId: socket.id });
+  });
+
   // ======================================
   // CONSULTATION CHAT
   // ======================================

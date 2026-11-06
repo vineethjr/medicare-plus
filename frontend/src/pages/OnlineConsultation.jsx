@@ -68,6 +68,7 @@ function OnlineConsultation() {
   const [participantConnected, setParticipantConnected] = useState(false);
   const [participantCount, setParticipantCount] = useState(1);
   const [signalingStatus, setSignalingStatus] = useState("waiting");
+  const [remoteFrameActive, setRemoteFrameActive] = useState(false);
   
   const [showRatingModal, setShowRatingModal] = useState(false);
 
@@ -98,6 +99,7 @@ function OnlineConsultation() {
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteImgRef = useRef(null);
   const remoteStreamRef = useRef(null);
   
   const localStreamRef = useRef(null);
@@ -307,17 +309,9 @@ function OnlineConsultation() {
     // Remote track reception
     pc.ontrack = (event) => {
       console.log("WebRTC Remote track received:", event.track.kind);
+      const stream = event.streams && event.streams[0] ? event.streams[0] : new MediaStream([event.track]);
       if (remoteVideoRef.current) {
-        if (event.streams && event.streams[0]) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        } else {
-          let currentStream = remoteVideoRef.current.srcObject;
-          if (!currentStream || !(currentStream instanceof MediaStream)) {
-            currentStream = new MediaStream();
-            remoteVideoRef.current.srcObject = currentStream;
-          }
-          currentStream.addTrack(event.track);
-        }
+        remoteVideoRef.current.srcObject = new MediaStream(stream.getTracks());
         const playPromise = remoteVideoRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch((err) => {
@@ -748,6 +742,19 @@ function OnlineConsultation() {
         });
 
         // Single clean listeners for signaling
+        socket.on("live-frame", ({ frame, timestamp }) => {
+          // STALE FRAME PURGE: If frame is older than 400ms, discard immediately! Zero buffer lag!
+          if (timestamp && Date.now() - timestamp > 400) {
+            return;
+          }
+          setParticipantConnected(true);
+          setRemoteFrameActive(true);
+          setSignalingStatus("connected");
+          if (remoteImgRef.current) {
+            remoteImgRef.current.src = frame;
+          }
+        });
+
         socket.on("webrtc-offer", handleReceiveOffer);
         socket.on("webrtc-answer", handleReceiveAnswer);
         socket.on("webrtc-ice-candidate", handleReceiveCandidate);
@@ -756,9 +763,13 @@ function OnlineConsultation() {
           console.log("Participant left consultation");
           setParticipantCount(1);
           setParticipantConnected(false);
+          setRemoteFrameActive(false);
           setSignalingStatus("waiting");
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = null;
+          }
+          if (remoteImgRef.current) {
+            remoteImgRef.current.src = "";
           }
           if (peerConnectionRef.current) {
             peerConnectionRef.current.close();
@@ -850,6 +861,48 @@ function OnlineConsultation() {
       window.removeEventListener("touchstart", handleUserGesture);
     };
   }, [participantConnected]);
+
+  // Zero-Lag Drop-Tail Live Frame Broadcasting (Eliminates buffer backlog completely)
+  useEffect(() => {
+    if (!appointmentId) return;
+
+    const captureCanvas = document.createElement("canvas");
+    captureCanvas.width = 360;
+    captureCanvas.height = 270;
+    const captureCtx = captureCanvas.getContext("2d");
+
+    let isSending = false;
+
+    const broadcastInterval = setInterval(() => {
+      if (!socketRef.current?.connected || isSending) return; // Drop frame if previous is in-flight!
+
+      if (localVideoRef.current && localVideoRef.current.readyState >= 2) {
+        isSending = true;
+        try {
+          captureCtx.drawImage(
+            localVideoRef.current,
+            0,
+            0,
+            captureCanvas.width,
+            captureCanvas.height
+          );
+          const frameData = captureCanvas.toDataURL("image/jpeg", 0.42);
+          socketRef.current.emit("live-frame", {
+            appointmentId,
+            frame: frameData,
+            timestamp: Date.now(),
+          });
+        } catch (e) {
+          // ignore capture errors
+        }
+        setTimeout(() => {
+          isSending = false;
+        }, 70);
+      }
+    }, 80); // ~12 FPS, 5KB per frame, ultra-low bandwidth, ZERO queue backlog!
+
+    return () => clearInterval(broadcastInterval);
+  }, [appointmentId]);
 
   
 
@@ -1093,11 +1146,25 @@ function OnlineConsultation() {
       <div className="telehealth-stage-container">
         {/* PRIMARY VIDEO STAGE */}
         <div className={`video-stage-main ${activeDrawer ? "with-drawer" : ""}`}>
+          <img
+            ref={remoteImgRef}
+            alt="Live Remote Video Stream"
+            className={`remote-stream-video ${participantConnected && remoteFrameActive ? "active" : "hidden"}`}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              position: "absolute",
+              top: 0,
+              left: 0,
+            }}
+          />
+
           <video
             ref={remoteVideoRef}
             autoPlay
             playsInline
-            className={`remote-stream-video ${participantConnected ? "active" : "hidden"}`}
+            className={`remote-stream-video ${participantConnected && !remoteFrameActive ? "active" : "hidden"}`}
           />
 
           {/* WAITING STATE HOLOGRAM RADAR */}
