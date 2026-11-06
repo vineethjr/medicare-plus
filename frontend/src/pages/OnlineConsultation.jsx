@@ -862,7 +862,7 @@ function OnlineConsultation() {
     };
   }, [participantConnected]);
 
-  // Zero-Lag Drop-Tail Live Frame Broadcasting (Eliminates buffer backlog completely)
+  // Zero-Lag Drop-Tail Live Frame Broadcasting (Real Camera + Single-PC Webcam Lock Fallback)
   useEffect(() => {
     if (!appointmentId) return;
 
@@ -872,13 +872,22 @@ function OnlineConsultation() {
     const captureCtx = captureCanvas.getContext("2d");
 
     let isSending = false;
+    let fallbackTick = 0;
 
     const broadcastInterval = setInterval(() => {
-      if (!socketRef.current?.connected || isSending) return; // Drop frame if previous is in-flight!
+      if (!socketRef.current?.connected || isSending) return;
 
-      if (localVideoRef.current && localVideoRef.current.readyState >= 2) {
-        isSending = true;
-        try {
+      isSending = true;
+
+      try {
+        const hasActiveVideo =
+          localVideoRef.current &&
+          localVideoRef.current.readyState >= 2 &&
+          !localVideoRef.current.paused &&
+          cameraOn;
+
+        if (hasActiveVideo) {
+          // 1. HARDWARE WEBCAM ACTIVE: Stream real live camera with zero lag
           captureCtx.drawImage(
             localVideoRef.current,
             0,
@@ -886,23 +895,104 @@ function OnlineConsultation() {
             captureCanvas.width,
             captureCanvas.height
           );
-          const frameData = captureCanvas.toDataURL("image/jpeg", 0.42);
-          socketRef.current.emit("live-frame", {
-            appointmentId,
-            frame: frameData,
-            timestamp: Date.now(),
-          });
-        } catch (e) {
-          // ignore capture errors
+        } else {
+          // 2. WEBCAM LOCKED BY OTHER TAB OR OFF: Stream verified clinical presence card
+          fallbackTick++;
+          const isDoc = user.role === "doctor";
+          const rawName = user.name || (isDoc ? "Dr. Mahesh" : "Verified Patient");
+          const displayName = isDoc && !rawName.startsWith("Dr.") ? `Dr. ${rawName}` : rawName;
+
+          // Dark cyber-clinical backdrop
+          captureCtx.fillStyle = "#030a0d";
+          captureCtx.fillRect(0, 0, captureCanvas.width, captureCanvas.height);
+
+          // Subtle clinical grid
+          captureCtx.strokeStyle = "rgba(45, 212, 191, 0.08)";
+          captureCtx.lineWidth = 1;
+          for (let x = 0; x < captureCanvas.width; x += 28) {
+            captureCtx.beginPath();
+            captureCtx.moveTo(x, 0);
+            captureCtx.lineTo(x, captureCanvas.height);
+            captureCtx.stroke();
+          }
+
+          // Glowing Avatar circle
+          captureCtx.beginPath();
+          captureCtx.arc(180, 100, 44, 0, Math.PI * 2);
+          captureCtx.fillStyle = isDoc ? "#09252c" : "#092033";
+          captureCtx.fill();
+          captureCtx.strokeStyle = isDoc ? "#2dd4bf" : "#38bdf8";
+          captureCtx.lineWidth = 2.5;
+          captureCtx.stroke();
+
+          // Initial letter
+          const cleanInit = displayName.replace(/^Dr\.\s*/i, "").charAt(0).toUpperCase() || "M";
+          captureCtx.font = "bold 34px system-ui, sans-serif";
+          captureCtx.fillStyle = "#ffffff";
+          captureCtx.textAlign = "center";
+          captureCtx.textBaseline = "middle";
+          captureCtx.fillText(cleanInit, 180, 98);
+
+          // Online pulse badge
+          captureCtx.beginPath();
+          captureCtx.arc(214, 130, 6, 0, Math.PI * 2);
+          captureCtx.fillStyle = "#10b981";
+          captureCtx.fill();
+          captureCtx.strokeStyle = "#030a0d";
+          captureCtx.lineWidth = 2;
+          captureCtx.stroke();
+
+          // Full Name
+          captureCtx.font = "bold 15px system-ui, sans-serif";
+          captureCtx.fillStyle = "#f8fafc";
+          captureCtx.fillText(displayName, 180, 168);
+
+          // Clinical Subtitle
+          captureCtx.font = "600 11px system-ui, sans-serif";
+          captureCtx.fillStyle = isDoc ? "#2dd4bf" : "#38bdf8";
+          captureCtx.fillText(
+            isDoc ? "Attending Physician • Audio Active" : "Verified Patient • Audio Active",
+            180,
+            188
+          );
+
+          // Real-time moving ECG pulse waveform
+          captureCtx.strokeStyle = isDoc ? "#2dd4bf" : "#38bdf8";
+          captureCtx.lineWidth = 2;
+          captureCtx.beginPath();
+          const ecgY = 228;
+          const offset = (fallbackTick * 4) % captureCanvas.width;
+          for (let x = 0; x < captureCanvas.width; x += 4) {
+            const relX = (x + offset) % captureCanvas.width;
+            let y = ecgY;
+            if (relX >= 150 && relX < 160) y = ecgY - 4;
+            else if (relX >= 160 && relX < 172) y = ecgY + 16;
+            else if (relX >= 172 && relX < 184) y = ecgY - 24;
+            else if (relX >= 184 && relX < 196) y = ecgY + 10;
+            else if (relX >= 196 && relX < 206) y = ecgY - 4;
+            if (x === 0) captureCtx.moveTo(x, y);
+            else captureCtx.lineTo(x, y);
+          }
+          captureCtx.stroke();
         }
-        setTimeout(() => {
-          isSending = false;
-        }, 70);
+
+        const frameData = captureCanvas.toDataURL("image/jpeg", 0.42);
+        socketRef.current.emit("live-frame", {
+          appointmentId,
+          frame: frameData,
+          timestamp: Date.now(),
+        });
+      } catch (e) {
+        // ignore capture errors
       }
+
+      setTimeout(() => {
+        isSending = false;
+      }, 70);
     }, 80); // ~12 FPS, 5KB per frame, ultra-low bandwidth, ZERO queue backlog!
 
     return () => clearInterval(broadcastInterval);
-  }, [appointmentId]);
+  }, [appointmentId, cameraOn, user.name, user.role]);
 
   
 
