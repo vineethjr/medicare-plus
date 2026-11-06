@@ -162,6 +162,7 @@ router.get("/patient", protect, (req, res) => {
     const appointments = db.prepare(`
       SELECT
         a.id,
+        a.doctor_id,
         a.appointment_date,
         a.appointment_time,
         a.symptoms,
@@ -179,9 +180,14 @@ router.get("/patient", protect, (req, res) => {
         u.name AS doctor_name,
         u.specialization,
         u.hospital,
-        u.consultation_fee
+        u.consultation_fee,
+        r.id AS review_id,
+        r.rating AS review_rating,
+        r.comment AS review_comment,
+        r.created_at AS review_created_at
       FROM appointments a
       JOIN users u ON a.doctor_id = u.id
+      LEFT JOIN reviews r ON r.appointment_id = a.id
       WHERE a.patient_id = ?
         AND COALESCE(a.patient_hidden, 0) = 0
       ORDER BY
@@ -531,12 +537,22 @@ router.get("/doctor/stats", protect, (req, res) => {
         AND payment_status = 'Paid'
     `).get(req.user.id).count;
 
+    const reviewStats = db.prepare(`
+      SELECT
+        COALESCE(ROUND(AVG(rating), 1), 5.0) AS average_rating,
+        COUNT(*) AS total_reviews
+      FROM reviews
+      WHERE doctor_id = ?
+    `).get(req.user.id);
+
     res.json({
       todayAppointments,
       totalPatients,
       pendingRequests,
       totalEarnings: earningsRow ? earningsRow.total : 0,
       paidAppointments,
+      averageRating: reviewStats ? reviewStats.average_rating : 5.0,
+      totalReviews: reviewStats ? reviewStats.total_reviews : 0,
     });
   } catch (error) {
     console.error("Doctor statistics error:", error);

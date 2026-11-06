@@ -39,6 +39,7 @@ function DoctorDashboard() {
   });
 
   const [recentAppointments, setRecentAppointments] = useState([]);
+  const [doctorReviews, setDoctorReviews] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Selected patient for dossier inspection modal
@@ -51,13 +52,16 @@ function DoctorDashboard() {
       try {
         setLoading(true);
 
-        const [statsRes, apptsRes] = await Promise.all([
+        const [statsRes, apptsRes, reviewsRes] = await Promise.all([
           fetch(`${API_URL}/appointments/doctor/stats`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
           fetch(`${API_URL}/appointments/doctor`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
+          fetch(`${API_URL}/reviews/doctor/${user.id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => null),
         ]);
 
         if (statsRes.status === 401 || apptsRes.status === 401) {
@@ -75,6 +79,11 @@ function DoctorDashboard() {
         if (apptsRes.ok) {
           const apptsData = await apptsRes.json();
           setRecentAppointments(Array.isArray(apptsData) ? apptsData : []);
+        }
+
+        if (reviewsRes && reviewsRes.ok) {
+          const reviewsData = await reviewsRes.json();
+          setDoctorReviews(Array.isArray(reviewsData.reviews) ? reviewsData.reviews : []);
         }
       } catch (err) {
         console.error("Failed to load doctor dashboard data:", err);
@@ -360,6 +369,23 @@ function DoctorDashboard() {
             </div>
             <div className="stat-bar orange"></div>
           </div>
+
+          {/* PATIENT RATING & REVIEWS */}
+          <div className="stat-card">
+            <div className="stat-card-top">
+              <span className="stat-label">PATIENT RATING</span>
+              <div className="stat-icon" style={{ background: "rgba(245, 158, 11, 0.15)", color: "#f59e0b" }}>
+                <StarIcon size={18} fill="#f59e0b" />
+              </div>
+            </div>
+            <div className="stat-number" style={{ color: "#fbbf24" }}>
+              {loading ? "..." : (stats.averageRating ? `${Number(stats.averageRating).toFixed(1)} ★` : "5.0 ★")}
+            </div>
+            <div className="stat-subtext">
+              Based on {stats.totalReviews || 0} verified patient review{stats.totalReviews === 1 ? "" : "s"}
+            </div>
+            <div className="stat-bar" style={{ background: "#f59e0b" }}></div>
+          </div>
         </section>
 
         {/* CLINICAL QUEUE SECTION WITH PATIENT PROFILE DOSSIER */}
@@ -545,6 +571,61 @@ function DoctorDashboard() {
               </div>
             )}
           </div>
+        </section>
+
+        {/* PATIENT REVIEWS & FEEDBACK */}
+        <div className="section-header-bar" style={{ marginTop: "32px" }}>
+          <div>
+            <span className="section-label">PATIENT VOICES</span>
+            <h2>Post-Consultation Reviews & Ratings</h2>
+          </div>
+          <div className="live-status-pill" style={{ color: "#fbbf24", borderColor: "rgba(245, 158, 11, 0.3)" }}>
+            ★ {stats.averageRating ? Number(stats.averageRating).toFixed(1) : "5.0"} • {stats.totalReviews || 0} Review{stats.totalReviews === 1 ? "" : "s"}
+          </div>
+        </div>
+
+        <section style={{ marginBottom: "32px" }}>
+          {doctorReviews.length === 0 ? (
+            <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: "14px", padding: "28px", textAlign: "center", color: "#94a3b8" }}>
+              <div style={{ color: "#f59e0b", marginBottom: "8px" }}>
+                <StarIcon size={32} fill="#f59e0b" />
+              </div>
+              <h3 style={{ color: "#f8fafc", margin: "0 0 6px 0", fontSize: "16px" }}>No Patient Reviews Yet</h3>
+              <p style={{ margin: 0, fontSize: "13px" }}>Patients can rate and leave feedback after their appointments are marked as completed.</p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
+              {doctorReviews.slice(0, 6).map((rev) => (
+                <div key={rev.id} style={{ background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.15)", borderRadius: "12px", padding: "16px 18px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "linear-gradient(135deg, #0d9488, #0284c7)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", color: "#fff", fontSize: "13px" }}>
+                        {(rev.patient_name || "P").charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <strong style={{ color: "#f8fafc", fontSize: "13.5px", display: "block" }}>{rev.patient_name || "Verified Patient"}</strong>
+                        <small style={{ color: "#64748b", fontSize: "11px" }}>{new Date(rev.created_at).toLocaleDateString()}</small>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "2px", color: "#f59e0b" }}>
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <StarIcon key={s} size={14} fill={s <= rev.rating ? "#f59e0b" : "none"} />
+                      ))}
+                      <strong style={{ fontSize: "12px", marginLeft: "4px" }}>{rev.rating}.0</strong>
+                    </div>
+                  </div>
+                  {rev.comment && (
+                    <p style={{ margin: 0, fontSize: "13px", color: "#cbd5e1", lineHeight: "1.5", fontStyle: "italic" }}>
+                      "{rev.comment}"
+                    </p>
+                  )}
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#2dd4bf", fontSize: "11px", fontWeight: "600", marginTop: "auto" }}>
+                    <CheckCircleIcon size={13} /> Completed Consultation Verified
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* WORKSPACE ACTION CARDS */}

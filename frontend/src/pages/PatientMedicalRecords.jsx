@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import "./PatientMedicalRecords.css";
 import QRCode from "qrcode";
 import PrescriptionQRCode from "../components/PrescriptionQRCode";
+import RatingReviewModal from "../components/RatingReviewModal";
 import {
   CalendarIcon,
   FileTextIcon,
@@ -275,6 +276,7 @@ function PatientMedicalRecords() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reviewModalAppointment, setReviewModalAppointment] = useState(null);
 
   const token = localStorage.getItem("token");
 
@@ -481,6 +483,57 @@ function PatientMedicalRecords() {
                       </div>
                     )}
 
+                    {/* PATIENT RATING & REVIEW FOR CONSULTATION */}
+                    {record.review_id ? (
+                      <div className="record-review-box" style={{ background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.25)", borderRadius: "8px", padding: "10px 14px", marginTop: "12px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                          <span style={{ fontSize: "12px", fontWeight: "700", color: "#fbbf24" }}>Your Consultation Rating:</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "2px", color: "#f59e0b" }}>
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <StarIcon key={s} size={13} fill={s <= record.review_rating ? "#f59e0b" : "none"} />
+                            ))}
+                            <strong style={{ fontSize: "12px", marginLeft: "4px" }}>{record.review_rating}.0</strong>
+                          </div>
+                        </div>
+                        {record.review_comment && (
+                          <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#cbd5e1", fontStyle: "italic" }}>
+                            "{record.review_comment}"
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setReviewModalAppointment({
+                          id: record.appointment_id,
+                          doctor_id: record.doctor_id,
+                          doctor_name: record.doctor_name,
+                          specialization: record.specialization,
+                          appointment_date: record.appointment_date,
+                          appointment_time: record.appointment_time,
+                          review_rating: null,
+                          review_comment: "",
+                        })}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          background: "rgba(245, 158, 11, 0.12)",
+                          color: "#fbbf24",
+                          border: "1px solid rgba(245, 158, 11, 0.3)",
+                          padding: "8px 14px",
+                          borderRadius: "8px",
+                          fontWeight: "600",
+                          fontSize: "12px",
+                          cursor: "pointer",
+                          marginTop: "10px"
+                        }}
+                      >
+                        <StarIcon size={14} fill="#f59e0b" />
+                        <span>Rate & Review Doctor</span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       className="print-prescription-btn"
@@ -496,6 +549,23 @@ function PatientMedicalRecords() {
           </section>
         )}
       </main>
+
+      {/* RATING & REVIEW MODAL */}
+      <RatingReviewModal
+        isOpen={Boolean(reviewModalAppointment)}
+        onClose={() => setReviewModalAppointment(null)}
+        appointment={reviewModalAppointment}
+        onReviewSubmitted={(newRev) => {
+          setRecords((prev) =>
+            prev.map((r) =>
+              r.appointment_id === reviewModalAppointment?.id
+                ? { ...r, review_id: newRev.id, review_rating: newRev.rating, review_comment: newRev.comment }
+                : r
+            )
+          );
+          setReviewModalAppointment(null);
+        }}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import "./OnlineConsultation.css";
 import PrescriptionQRCode from "../components/PrescriptionQRCode";
+import RatingReviewModal from "../components/RatingReviewModal";
 import {
   ActivityIcon,
   AlertCircleIcon,
@@ -23,6 +24,7 @@ import {
   PlusIcon,
   ShieldCheckIcon,
   SparklesIcon,
+  StarIcon,
   StethoscopeIcon,
   UserIcon,
   VideoIcon,
@@ -58,6 +60,7 @@ function OnlineConsultation() {
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showRatingModal, setShowRatingModal] = useState(false);
   const [mediaError, setMediaError] = useState("");
 
   const [micOn, setMicOn] = useState(true);
@@ -656,17 +659,28 @@ function OnlineConsultation() {
     }
   }
 
-  function handleEndConsultation() {
+  async function handleEndConsultation() {
     if (window.confirm("Are you sure you want to conclude this video consultation session?")) {
       if (isDoctor) {
-        fetch(`${API_URL}/appointments/${appointmentId}/status`, {
-          method: "PUT",
-          headers: authHeaders,
-          body: JSON.stringify({ status: "Completed" }),
-        }).catch(() => {});
+        try {
+          await fetch(`${API_URL}/appointments/${appointmentId}/status`, {
+            method: "PUT",
+            headers: authHeaders,
+            body: JSON.stringify({ status: "Completed" }),
+          });
+        } catch {}
         navigate("/doctor-dashboard");
       } else {
-        navigate("/patient-dashboard");
+        // Patient ending consultation: prompt for doctor rating and review
+        try {
+          await fetch(`${API_URL}/appointments/${appointmentId}/status`, {
+            method: "PUT",
+            headers: authHeaders,
+            body: JSON.stringify({ status: "Completed" }),
+          });
+          setAppointment((prev) => prev ? { ...prev, status: "Completed" } : prev);
+        } catch {}
+        setShowRatingModal(true);
       }
     }
   }
@@ -1006,6 +1020,19 @@ function OnlineConsultation() {
             </button>
 
             {/* END CALL BUTTON */}
+            {!isDoctor && (
+              <button
+                type="button"
+                className="dock-btn rating-btn"
+                onClick={() => setShowRatingModal(true)}
+                title="Rate and Review Doctor"
+                style={{ background: "rgba(245, 158, 11, 0.2)", borderColor: "#f59e0b", color: "#fbbf24" }}
+              >
+                <StarIcon size={16} fill="#f59e0b" />
+                <span>Rate Doctor</span>
+              </button>
+            )}
+
             <button
               type="button"
               className="dock-btn-leave"
@@ -1382,6 +1409,20 @@ function OnlineConsultation() {
           </aside>
         )}
       </div>
+
+      {/* RATING & REVIEW MODAL (AFTER CONSULTATION) */}
+      <RatingReviewModal
+        isOpen={showRatingModal}
+        onClose={() => {
+          setShowRatingModal(false);
+          navigate("/patient-appointments");
+        }}
+        appointment={appointment}
+        onReviewSubmitted={() => {
+          setShowRatingModal(false);
+          navigate("/patient-appointments");
+        }}
+      />
     </div>
   );
 }

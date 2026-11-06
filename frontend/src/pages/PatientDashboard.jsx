@@ -127,7 +127,7 @@ function PatientDashboard() {
             onClick={() => navigate("/doctor-recommendation")}
           >
             <span className="sidebar-link-icon"><SparklesIcon size={18} /></span>
-            <span>AI Symptom Checker</span>
+            <span>Symptom Checker</span>
           </button>
 
           <button
@@ -234,7 +234,7 @@ function PatientDashboard() {
                   onClick={() => navigate("/doctor-recommendation")}
                 >
                   <SparklesIcon size={16} />
-                  <span>AI Symptom Checker</span>
+                  <span>Symptom Checker</span>
                 </button>
               </div>
             </div>
@@ -432,8 +432,8 @@ function PatientDashboard() {
               <div className="feature-card-icon">
                 <SparklesIcon size={24} />
               </div>
-              <span className="feature-code">02 / AI DIAGNOSTICS</span>
-              <h3>AI Symptom Checker</h3>
+              <span className="feature-code">02 / DIAGNOSTICS</span>
+              <h3>Symptom Checker</h3>
               <p>Describe symptoms in natural language and receive clinical guidance.</p>
               <button
                 className="dashboard-button"

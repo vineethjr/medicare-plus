@@ -258,6 +258,33 @@ db.exec(`
 `);
 
 // ========================================
+// REVIEWS TABLE
+// ========================================
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    appointment_id INTEGER NOT NULL UNIQUE,
+    patient_id INTEGER NOT NULL,
+    doctor_id INTEGER NOT NULL,
+    rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+    comment TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (doctor_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_reviews_doctor ON reviews(doctor_id);
+  CREATE INDEX IF NOT EXISTS idx_reviews_patient ON reviews(patient_id);
+  CREATE INDEX IF NOT EXISTS idx_reviews_appointment ON reviews(appointment_id);
+`);
+
+
+// ========================================
 // INITIAL SEED DATA
 // ========================================
 
@@ -450,6 +477,54 @@ function seedInitialDataIfEmpty() {
 }
 
 seedInitialDataIfEmpty();
+
+function seedReviewsIfEmpty() {
+  try {
+    const count = db.prepare("SELECT COUNT(*) AS count FROM reviews").get().count;
+    if (count === 0) {
+      const completedAppts = db.prepare(`
+        SELECT a.id, a.patient_id, a.doctor_id
+        FROM appointments a
+        WHERE a.status = 'Completed'
+        LIMIT 4
+      `).all();
+
+      const sampleReviews = [
+        {
+          rating: 5,
+          comment: "Dr. Vineeth was extremely professional, patient, and thorough in diagnosing my condition. The prescribed regimen helped me recover completely in 3 days. Highly recommended!"
+        },
+        {
+          rating: 5,
+          comment: "Excellent telehealth consultation. The doctor listened to all my symptoms attentively, explained the causes clearly, and provided reassuring guidance."
+        },
+        {
+          rating: 4,
+          comment: "Very knowledgeable specialist. The consultation was concise and on time, and the digital prescription was easy to understand."
+        },
+        {
+          rating: 5,
+          comment: "Great experience overall. Highly compassionate care, clear dosage instructions, and prompt follow-up advice."
+        }
+      ];
+
+      const insertReview = db.prepare(`
+        INSERT INTO reviews (appointment_id, patient_id, doctor_id, rating, comment, created_at)
+        VALUES (?, ?, ?, ?, ?, datetime('now', '-2 days'))
+      `);
+
+      completedAppts.forEach((appt, index) => {
+        const rev = sampleReviews[index % sampleReviews.length];
+        insertReview.run(appt.id, appt.patient_id, appt.doctor_id, rev.rating, rev.comment);
+      });
+      console.log(`Seeded ${completedAppts.length} initial reviews.`);
+    }
+  } catch (err) {
+    console.error("Error seeding reviews:", err.message);
+  }
+}
+
+seedReviewsIfEmpty();
 
 // ========================================
 // EXPORT DATABASE

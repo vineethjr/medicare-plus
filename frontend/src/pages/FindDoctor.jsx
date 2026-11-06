@@ -601,11 +601,15 @@ function FindDoctor() {
                   </span>
                   <div className="doctor-rating-pill">
                     <div style={{ display: "flex", gap: "2px", color: "#f59e0b" }}>
-                      {[...Array(5)].map((_, i) => (
-                        <StarIcon key={i} size={12} />
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <StarIcon key={s} size={12} fill={s <= Math.round(Number(doctor.average_rating) || 5) ? "#f59e0b" : "none"} />
                       ))}
                     </div>
-                    <span>4.9 (180+ reviews)</span>
+                    <span>
+                      {doctor.review_count > 0
+                        ? `${Number(doctor.average_rating).toFixed(1)} (${doctor.review_count} review${doctor.review_count === 1 ? "" : "s"})`
+                        : "5.0 (New Doctor)"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1039,6 +1043,44 @@ function FindDoctor() {
                             <span>Inspect Document</span>
                           </button>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* PATIENT REVIEWS & RATINGS */}
+              <div className="verify-section">
+                <div className="verify-section-header">
+                  <h3>Verified Patient Reviews & Ratings</h3>
+                  <span className="doc-count-pill" style={{ background: "rgba(245, 158, 11, 0.15)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)" }}>
+                    ★ {verifyingDoctor.average_rating ? Number(verifyingDoctor.average_rating).toFixed(1) : "5.0"} ({verifyingDoctor.reviews?.length || verifyingDoctor.review_count || 0})
+                  </span>
+                </div>
+
+                {!verifyingDoctor.reviews || verifyingDoctor.reviews.length === 0 ? (
+                  <div className="empty-cert-notice">
+                    <StarIcon size={24} fill="#f59e0b" />
+                    <div>
+                      <strong>No Patient Reviews Yet</strong>
+                      <p>Reviews will appear here once verified patients conclude their consultations with Dr. {verifyingDoctor.name}.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="verify-reviews-list" style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "12px" }}>
+                    {verifyingDoctor.reviews.map((rev) => (
+                      <div key={rev.id} style={{ background: "rgba(15, 23, 42, 0.6)", border: "1px solid rgba(148, 163, 184, 0.15)", borderRadius: "10px", padding: "12px 14px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                          <strong style={{ fontSize: "13px", color: "#f8fafc" }}>{rev.patient_name || "Verified Patient"}</strong>
+                          <div style={{ display: "flex", alignItems: "center", gap: "2px", color: "#f59e0b" }}>
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <StarIcon key={s} size={13} fill={s <= rev.rating ? "#f59e0b" : "none"} />
+                            ))}
+                            <span style={{ fontSize: "11px", fontWeight: "700", marginLeft: "4px" }}>{rev.rating}.0</span>
+                          </div>
+                        </div>
+                        {rev.comment && <p style={{ fontSize: "12.5px", color: "#cbd5e1", margin: "0 0 6px 0", lineHeight: "1.4" }}>"{rev.comment}"</p>}
+                        <small style={{ color: "#64748b", fontSize: "11px" }}>Consultation Verified • {new Date(rev.created_at).toLocaleDateString()}</small>
                       </div>
                     ))}
                   </div>

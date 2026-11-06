@@ -31,7 +31,9 @@ router.get("/profile", protect, (req, res) => {
           bio,
           availability,
           medical_license,
-          verification_status
+          verification_status,
+          COALESCE((SELECT ROUND(AVG(rating), 1) FROM reviews WHERE doctor_id = users.id), 5.0) AS average_rating,
+          COALESCE((SELECT COUNT(*) FROM reviews WHERE doctor_id = users.id), 0) AS review_count
         FROM users
         WHERE id = ? AND role = 'doctor'
         `
@@ -65,9 +67,20 @@ router.get("/profile", protect, (req, res) => {
       )
       .all(req.user.id);
 
+    const reviews = db
+      .prepare(`
+        SELECT r.id, r.rating, r.comment, r.created_at, u.name AS patient_name
+        FROM reviews r
+        JOIN users u ON r.patient_id = u.id
+        WHERE r.doctor_id = ?
+        ORDER BY r.created_at DESC
+      `)
+      .all(req.user.id);
+
     res.json({
       ...doctor,
       documents: documents || [],
+      reviews: reviews || [],
     });
   } catch (error) {
     console.error("Get doctor profile error:", error.message);
@@ -280,7 +293,9 @@ router.get("/", protect, (req, res) => {
           bio,
           availability,
           medical_license,
-          verification_status
+          verification_status,
+          COALESCE((SELECT ROUND(AVG(rating), 1) FROM reviews WHERE doctor_id = users.id), 5.0) AS average_rating,
+          COALESCE((SELECT COUNT(*) FROM reviews WHERE doctor_id = users.id), 0) AS review_count
         FROM users
         WHERE role = 'doctor'
         ORDER BY id DESC
@@ -317,9 +332,20 @@ router.get("/", protect, (req, res) => {
       docsByDoctor[doc.doctor_id].push(doc);
     }
 
+    const allReviews = db.prepare("SELECT r.id, r.doctor_id, r.patient_id, r.rating, r.comment, r.created_at, u.name AS patient_name FROM reviews r JOIN users u ON r.patient_id = u.id ORDER BY r.created_at DESC").all();
+
+    const reviewsByDoctor = {};
+    for (const rev of allReviews) {
+      if (!reviewsByDoctor[rev.doctor_id]) {
+        reviewsByDoctor[rev.doctor_id] = [];
+      }
+      reviewsByDoctor[rev.doctor_id].push(rev);
+    }
+
     const doctorsWithDocs = doctors.map((doc) => ({
       ...doc,
       documents: docsByDoctor[doc.id] || [],
+      reviews: reviewsByDoctor[doc.id] || [],
     }));
 
     res.json(doctorsWithDocs);
@@ -353,7 +379,9 @@ router.get("/verify/:id", (req, res) => {
           availability,
           medical_license,
           verification_status,
-          created_at
+          created_at,
+          COALESCE((SELECT ROUND(AVG(rating), 1) FROM reviews WHERE doctor_id = users.id), 5.0) AS average_rating,
+          COALESCE((SELECT COUNT(*) FROM reviews WHERE doctor_id = users.id), 0) AS review_count
         FROM users
         WHERE id = ? AND role = 'doctor'
         `
@@ -384,9 +412,20 @@ router.get("/verify/:id", (req, res) => {
       )
       .all(doctor.id);
 
+    const reviews = db
+      .prepare(`
+        SELECT r.id, r.rating, r.comment, r.created_at, u.name AS patient_name
+        FROM reviews r
+        JOIN users u ON r.patient_id = u.id
+        WHERE r.doctor_id = ?
+        ORDER BY r.created_at DESC
+      `)
+      .all(doctor.id);
+
     res.json({
       ...doctor,
       documents: documents || [],
+      reviews: reviews || [],
       verified_at: new Date().toISOString(),
       registry_seal: `MEDICARE-AUTH-${doctor.id}-${(doctor.medical_license || "REG").replace(/[^a-zA-Z0-9]/g, "")}`,
     });
@@ -451,9 +490,30 @@ router.get("/:id", protect, (req, res) => {
       )
       .all(doctor.id);
 
+    const reviews = db
+      .prepare(`
+        SELECT r.id, r.rating, r.comment, r.created_at, u.name AS patient_name
+        FROM reviews r
+        JOIN users u ON r.patient_id = u.id
+        WHERE r.doctor_id = ?
+        ORDER BY r.created_at DESC
+      `)
+      .all(doctor.id);
+
+    const reviewSummary = db
+      .prepare(`
+        SELECT COALESCE(ROUND(AVG(rating), 1), 5.0) AS avg_rating, COUNT(*) as rev_count
+        FROM reviews
+        WHERE doctor_id = ?
+      `)
+      .get(doctor.id);
+
     res.json({
       ...doctor,
+      average_rating: reviewSummary ? reviewSummary.avg_rating : 5.0,
+      review_count: reviewSummary ? reviewSummary.rev_count : 0,
       documents: documents || [],
+      reviews: reviews || [],
     });
   } catch (error) {
     console.error("Get doctor details error:", error.message);

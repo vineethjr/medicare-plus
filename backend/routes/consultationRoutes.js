@@ -221,10 +221,15 @@ router.get("/patient", protect, (req, res) => {
           users.verification_status,
           appointments.appointment_date,
           appointments.appointment_time,
-          appointments.consultation_mode
+          appointments.consultation_mode,
+          appointments.status AS appointment_status,
+          r.id AS review_id,
+          r.rating AS review_rating,
+          r.comment AS review_comment
         FROM consultation_records AS cr
         JOIN users ON cr.doctor_id = users.id
         JOIN appointments ON cr.appointment_id = appointments.id
+        LEFT JOIN reviews r ON r.appointment_id = cr.appointment_id
         WHERE cr.patient_id = ?
         ORDER BY cr.created_at DESC`
       )

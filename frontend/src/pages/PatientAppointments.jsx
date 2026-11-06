@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./PatientAppointments.css";
+import RatingReviewModal from "../components/RatingReviewModal";
 import {
   AlertCircleIcon,
   ArrowRightIcon,
@@ -8,15 +9,12 @@ import {
   CheckCircleIcon,
   ClockIcon,
   CreditCardIcon,
-  DoctorIcon,
-  FileTextIcon,
   HospitalIcon,
   LockIcon,
   MailIcon,
   PrinterIcon,
   QrCodeIcon,
-  ShieldCheckIcon,
-  SparklesIcon,
+  StarIcon,
   VideoIcon,
   XIcon,
 } from "../components/Icons";
@@ -64,6 +62,7 @@ function PatientAppointments() {
   const [receiptData, setReceiptData] = useState(null);
   const [selectedBank, setSelectedBank] = useState("HDFC");
   const [promoApplied, setPromoApplied] = useState(false);
+  const [reviewingAppointment, setReviewingAppointment] = useState(null);
 
   // Fetch appointments
   const fetchAppointments = useCallback(
@@ -690,9 +689,63 @@ function PatientAppointments() {
               )}
 
               {status === "Completed" && (
-                <p className="completed-consultation" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <CheckCircleIcon size={15} /> Consultation completed. View your diagnosis and prescriptions in Medical Records.
-                </p>
+                <div className="completed-consultation-box">
+                  <p className="completed-consultation" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <CheckCircleIcon size={15} /> Consultation completed. View your diagnosis and prescriptions in Medical Records.
+                  </p>
+
+                  {/* PATIENT RATING & REVIEW CARD / CTA */}
+                  {appointment.review_rating ? (
+                    <div className="patient-review-summary-card">
+                      <div className="review-summary-top">
+                        <div className="review-stars-badge">
+                          <div style={{ display: "flex", gap: "2px", color: "#f59e0b" }}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <StarIcon
+                                key={star}
+                                size={14}
+                                fill={star <= appointment.review_rating ? "#f59e0b" : "#cbd5e1"}
+                              />
+                            ))}
+                          </div>
+                          <strong>{appointment.review_rating} / 5 Rating Given</strong>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-edit-appointment-review"
+                          onClick={() => setReviewingAppointment(appointment)}
+                        >
+                          <StarIcon size={13} fill="#0d9488" />
+                          <span>Edit Your Review</span>
+                        </button>
+                      </div>
+
+                      {appointment.review_comment && (
+                        <p className="patient-review-comment-text">
+                          "{appointment.review_comment}"
+                        </p>
+                      )}
+                      <small className="patient-review-date">
+                        Consultation review on file • Verified patient feedback
+                      </small>
+                    </div>
+                  ) : (
+                    <div className="patient-review-prompt-card">
+                      <div className="review-prompt-text">
+                        <strong>⭐ Rate your consultation with Dr. {appointment.doctor_name}</strong>
+                        <p>Share your review to help other patients and support verified clinical care.</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-open-review-modal"
+                        onClick={() => setReviewingAppointment(appointment)}
+                      >
+                        <StarIcon size={14} fill="#ffffff" />
+                        <span>Rate & Review Doctor</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
 
               {status === "Cancelled" && (
@@ -702,6 +755,17 @@ function PatientAppointments() {
               )}
 
               <div className="patient-appointment-actions">
+                {status === "Completed" && (
+                  <button
+                    type="button"
+                    className="patient-rate-button"
+                    onClick={() => setReviewingAppointment(appointment)}
+                  >
+                    <StarIcon size={15} fill="#f59e0b" />
+                    <span>{appointment.review_rating ? "Edit Review" : "Rate & Review Doctor"}</span>
+                  </button>
+                )}
+
                 {canChat && (
                   <button
                     className="patient-chat-button"
@@ -734,6 +798,32 @@ function PatientAppointments() {
           );
         })}
       </div>
+
+      {/* =========================================================
+          DOCTOR RATING & REVIEW MODAL
+          ========================================================= */}
+      {reviewingAppointment && (
+        <RatingReviewModal
+          appointment={reviewingAppointment}
+          isOpen={Boolean(reviewingAppointment)}
+          onClose={() => setReviewingAppointment(null)}
+          onSuccess={(savedReview) => {
+            setAppointments((prev) =>
+              prev.map((a) =>
+                a.id === reviewingAppointment.id
+                  ? {
+                      ...a,
+                      review_id: savedReview ? savedReview.id : null,
+                      review_rating: savedReview ? savedReview.rating : null,
+                      review_comment: savedReview ? savedReview.comment : null,
+                      review_created_at: savedReview ? savedReview.created_at : null,
+                    }
+                  : a
+              )
+            );
+          }}
+        />
+      )}
 
       {/* =========================================================
           CHECKOUT & PAYMENT MODAL
