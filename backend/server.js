@@ -154,6 +154,18 @@ io.on("connection", (socket) => {
   socket.on("webrtc-ice-candidate", handleCandidate);
   socket.on("ice-candidate", handleCandidate);
 
+  // Participant is ready with media stream and ready to receive/create offers
+  socket.on("client-ready", ({ appointmentId, role }) => {
+    const roomId = `consultation-${appointmentId}`;
+    socket.to(roomId).emit("client-ready", { role, senderId: socket.id });
+  });
+
+  // Explicit renegotiation request if handshake got stalled
+  socket.on("request-renegotiate", ({ appointmentId }) => {
+    const roomId = `consultation-${appointmentId}`;
+    socket.to(roomId).emit("request-renegotiate", { senderId: socket.id });
+  });
+
   // ======================================
   // CONSULTATION CHAT
   // ======================================

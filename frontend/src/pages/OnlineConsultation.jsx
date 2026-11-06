@@ -39,6 +39,15 @@ const rtcConfiguration = {
     { urls: "stun:stun3.l.google.com:19302" },
     { urls: "stun:stun4.l.google.com:19302" },
     { urls: "stun:global.stun.twilio.com:3478" },
+    {
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:443",
+        "turn:openrelay.metered.ca:443?transport=tcp",
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ],
   iceCandidatePoolSize: 10,
 };
@@ -184,7 +193,10 @@ function OnlineConsultation() {
   const socketRef = useRef(null);
   const appointmentRef = useRef(null);
   const iceCandidateQueueRef = useRef([]);
+  const seenCandidatesRef = useRef(new Set());
   const isInitiatingRef = useRef(false);
+  const negotiationTimeoutRef = useRef(null);
+  const watchdogIntervalRef = useRef(null);
 
   const token = localStorage.getItem("token");
   const isDoctor = user.role === "doctor";
@@ -356,11 +368,11 @@ function OnlineConsultation() {
   // WEBRTC PEER CONNECTION
   // --------------------------------------------------
   function createPeerConnection() {
-    if (peerConnectionRef.current) {
+    if (peerConnectionRef.current && peerConnectionRef.current.signalingState !== "closed") {
       return peerConnectionRef.current;
     }
 
-    console.log("Initializing RTCPeerConnection with STUN mesh...");
+    console.log("Initializing RTCPeerConnection with STUN/TURN mesh...");
     const pc = new RTCPeerConnection(rtcConfiguration);
     peerConnectionRef.current = pc;
 
@@ -368,7 +380,11 @@ function OnlineConsultation() {
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => {
         try {
-          pc.addTrack(track, localStreamRef.current);
+          const senders = pc.getSenders();
+          const alreadyAdded = senders.some((s) => s.track && s.track.id === track.id);
+          if (!alreadyAdded) {
+            pc.addTrack(track, localStreamRef.current);
+          }
         } catch (e) {
           console.warn("Could not add track to pc:", e);
         }
@@ -378,20 +394,24 @@ function OnlineConsultation() {
     // Remote track reception
     pc.ontrack = (event) => {
       console.log("WebRTC Remote track received:", event.track.kind);
+      const incomingStream = (event.streams && event.streams[0])
+        ? event.streams[0]
+        : new MediaStream([event.track]);
+
       if (remoteVideoRef.current) {
-        if (event.streams && event.streams[0]) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        } else {
-          let currentStream = remoteVideoRef.current.srcObject;
-          if (!currentStream || !(currentStream instanceof MediaStream)) {
-            currentStream = new MediaStream();
-            remoteVideoRef.current.srcObject = currentStream;
-          }
-          currentStream.addTrack(event.track);
+        if (remoteVideoRef.current.srcObject !== incomingStream) {
+          remoteVideoRef.current.srcObject = incomingStream;
         }
-        remoteVideoRef.current.play().catch((err) => {
-          console.log("Remote video autoplay note:", err);
-        });
+        const playPromise = remoteVideoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            console.warn("Remote autoplay restricted by browser policy; trying muted:", err);
+            if (remoteVideoRef.current) {
+              remoteVideoRef.current.muted = true;
+              remoteVideoRef.current.play().catch(() => {});
+            }
+          });
+        }
       }
       setParticipantConnected(true);
       setSignalingStatus("connected");
@@ -414,9 +434,9 @@ function OnlineConsultation() {
         setParticipantConnected(true);
         setSignalingStatus("connected");
       } else if (["disconnected", "failed"].includes(pc.connectionState)) {
-        console.warn("WebRTC connection disconnected/failed, attempting iceRestart");
-        if (pc.restartIce && isDoctor) {
-          pc.restartIce();
+        console.warn("WebRTC connection state issue:", pc.connectionState);
+        if (isDoctor) {
+          triggerNegotiation();
         }
       }
     };
@@ -427,9 +447,9 @@ function OnlineConsultation() {
         setParticipantConnected(true);
         setSignalingStatus("connected");
       } else if (pc.iceConnectionState === "failed") {
-        console.warn("ICE connection failed, triggering iceRestart");
-        if (pc.restartIce && isDoctor) {
-          pc.restartIce();
+        console.warn("ICE connection failed, triggering renegotiation");
+        if (isDoctor) {
+          triggerNegotiation();
         }
       }
     };
@@ -449,7 +469,22 @@ function OnlineConsultation() {
       setSignalingStatus("initiating");
       const pc = createPeerConnection();
 
-      // Only create offer when signaling state is stable
+      // Ensure local tracks are attached before creating offer
+      if (localStreamRef.current) {
+        const senders = pc.getSenders();
+        localStreamRef.current.getTracks().forEach((track) => {
+          const alreadyAdded = senders.some((s) => s.track && s.track.id === track.id);
+          if (!alreadyAdded) {
+            try {
+              pc.addTrack(track, localStreamRef.current);
+            } catch (err) {
+              console.warn("Track addition warning:", err);
+            }
+          }
+        });
+      }
+
+      // If signaling state is not stable, wait for stable or rollback if possible
       if (pc.signalingState !== "stable") {
         console.log("Signaling state not stable for offer:", pc.signalingState);
         isInitiatingRef.current = false;
@@ -482,6 +517,21 @@ function OnlineConsultation() {
       console.log("Patient received WebRTC offer. Creating answer...");
       setSignalingStatus("connecting");
       const pc = createPeerConnection();
+
+      // Ensure patient's local tracks are attached
+      if (localStreamRef.current) {
+        const senders = pc.getSenders();
+        localStreamRef.current.getTracks().forEach((track) => {
+          const alreadyAdded = senders.some((s) => s.track && s.track.id === track.id);
+          if (!alreadyAdded) {
+            try {
+              pc.addTrack(track, localStreamRef.current);
+            } catch (err) {
+              console.warn("Patient track addition warning:", err);
+            }
+          }
+        });
+      }
 
       if (pc.signalingState !== "stable") {
         await Promise.all([
@@ -544,8 +594,8 @@ function OnlineConsultation() {
   async function handleReceiveCandidate({ candidate }) {
     if (!candidate) return;
     const candKey = typeof candidate === "string" ? candidate : candidate.candidate;
-    if (candKey && seenCandidatesRef.current.has(candKey)) return;
-    if (candKey) seenCandidatesRef.current.add(candKey);
+    if (candKey && seenCandidatesRef.current?.has(candKey)) return;
+    if (candKey && seenCandidatesRef.current) seenCandidatesRef.current.add(candKey);
 
     try {
       const pc = peerConnectionRef.current;
@@ -557,6 +607,22 @@ function OnlineConsultation() {
     } catch (err) {
       console.warn("Error adding received ICE candidate:", err);
     }
+  }
+
+  function triggerNegotiation(forceRecreate = false) {
+    if (!isDoctor) return;
+    if (negotiationTimeoutRef.current) {
+      clearTimeout(negotiationTimeoutRef.current);
+    }
+    negotiationTimeoutRef.current = setTimeout(() => {
+      if (forceRecreate && peerConnectionRef.current) {
+        try {
+          peerConnectionRef.current.close();
+        } catch (e) {}
+        peerConnectionRef.current = null;
+      }
+      initiateOffer();
+    }, 300);
   }
 
   // --------------------------------------------------
@@ -709,16 +775,6 @@ function OnlineConsultation() {
     let cancelled = false;
     let socket;
 
-    function triggerNegotiation() {
-      if (!isDoctor) return;
-      if (negotiationTimeoutRef.current) {
-        clearTimeout(negotiationTimeoutRef.current);
-      }
-      negotiationTimeoutRef.current = setTimeout(() => {
-        initiateOffer();
-      }, 400);
-    }
-
     async function connectConsultation() {
       try {
         const stream = await startMedia();
@@ -737,6 +793,10 @@ function OnlineConsultation() {
           socket.emit("join-consultation", {
             appointmentId,
             user,
+          });
+          socket.emit("client-ready", {
+            appointmentId,
+            role: user.role,
           });
         });
 
@@ -764,6 +824,21 @@ function OnlineConsultation() {
           }
         });
 
+        socket.on("client-ready", ({ role }) => {
+          console.log("Remote peer announced client-ready:", role);
+          setParticipantCount((prev) => Math.max(prev, 2));
+          if (isDoctor) {
+            triggerNegotiation();
+          }
+        });
+
+        socket.on("request-renegotiate", ({ forceRecreate }) => {
+          console.log("Peer requested renegotiation. Force:", forceRecreate);
+          if (isDoctor) {
+            triggerNegotiation(forceRecreate);
+          }
+        });
+
         // Single clean listeners for signaling
         socket.on("webrtc-offer", handleReceiveOffer);
         socket.on("webrtc-answer", handleReceiveAnswer);
@@ -782,7 +857,9 @@ function OnlineConsultation() {
             peerConnectionRef.current = null;
           }
           iceCandidateQueueRef.current = [];
-          seenCandidatesRef.current.clear();
+          if (seenCandidatesRef.current) {
+            seenCandidatesRef.current.clear();
+          }
         });
       } catch (err) {
         console.error("Signaling error:", err);
@@ -795,6 +872,7 @@ function OnlineConsultation() {
       cancelled = true;
       if (negotiationTimeoutRef.current) {
         clearTimeout(negotiationTimeoutRef.current);
+        negotiationTimeoutRef.current = null;
       }
       if (socket) {
         socket.emit("leave-consultation", { appointmentId });
@@ -808,11 +886,62 @@ function OnlineConsultation() {
       }
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
       }
       iceCandidateQueueRef.current = [];
-      seenCandidatesRef.current.clear();
+      if (seenCandidatesRef.current) {
+        seenCandidatesRef.current.clear();
+      }
     };
   }, [appointment, appointmentId, isDoctor, token]);
+
+  // Watchdog effect: if 2 participants are in the room but P2P connection not established after 4 seconds, retry offer
+  useEffect(() => {
+    if (participantCount < 2 || participantConnected) {
+      if (watchdogIntervalRef.current) {
+        clearInterval(watchdogIntervalRef.current);
+        watchdogIntervalRef.current = null;
+      }
+      return;
+    }
+
+    watchdogIntervalRef.current = setInterval(() => {
+      if (isDoctor) {
+        const pc = peerConnectionRef.current;
+        if (!pc || pc.connectionState !== "connected") {
+          console.log("Watchdog: Retrying WebRTC negotiation offer...");
+          initiateOffer();
+        }
+      } else {
+        socketRef.current?.emit("request-renegotiate", { appointmentId });
+      }
+    }, 4000);
+
+    return () => {
+      if (watchdogIntervalRef.current) {
+        clearInterval(watchdogIntervalRef.current);
+        watchdogIntervalRef.current = null;
+      }
+    };
+  }, [participantCount, participantConnected, isDoctor, appointmentId]);
+
+  // Document gesture listener to unmute remote video if browser autoplay policy paused audio
+  useEffect(() => {
+    function handleUserGesture() {
+      if (remoteVideoRef.current && remoteVideoRef.current.muted && participantConnected) {
+        remoteVideoRef.current.muted = false;
+        remoteVideoRef.current.play().catch(() => {});
+      }
+    }
+    window.addEventListener("click", handleUserGesture);
+    window.addEventListener("keydown", handleUserGesture);
+    window.addEventListener("touchstart", handleUserGesture);
+    return () => {
+      window.removeEventListener("click", handleUserGesture);
+      window.removeEventListener("keydown", handleUserGesture);
+      window.removeEventListener("touchstart", handleUserGesture);
+    };
+  }, [participantConnected]);
 
   // CONTROLS
   function toggleMicrophone() {
@@ -1096,6 +1225,37 @@ function OnlineConsultation() {
                   <span className="meter-bar"></span>
                   <span className="meter-bar"></span>
                 </div>
+
+                {participantCount >= 2 && !participantConnected && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isDoctor) {
+                        triggerNegotiation(true);
+                      } else {
+                        socketRef.current?.emit("request-renegotiate", { appointmentId, forceRecreate: true });
+                      }
+                    }}
+                    style={{
+                      margin: "12px auto 6px auto",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "9px 18px",
+                      borderRadius: "8px",
+                      background: "linear-gradient(135deg, #0d9488, #14b8a6)",
+                      color: "#ffffff",
+                      fontWeight: 700,
+                      fontSize: "13px",
+                      border: "none",
+                      cursor: "pointer",
+                      boxShadow: "0 4px 14px rgba(13, 148, 136, 0.4)",
+                      transition: "transform 0.15s ease",
+                    }}
+                  >
+                    <SparklesIcon size={15} /> Force Reconnect Video Stream
+                  </button>
+                )}
 
                 <div className="waiting-status-badges-row">
                   <div className={`waiting-secure-tag ${participantCount >= 2 ? "active" : "waiting"}`}>
