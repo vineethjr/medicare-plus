@@ -235,7 +235,7 @@ function PatientProfile() {
           </button>
           <button className="sidebar-btn" onClick={() => navigate("/doctor-recommendation")}>
             <SparklesIcon size={18} />
-            <span>AI Symptom Checker</span>
+            <span>Symptom Analyser</span>
           </button>
           <button className="sidebar-btn" onClick={() => navigate("/patient-appointments")}>
             <CalendarIcon size={18} />

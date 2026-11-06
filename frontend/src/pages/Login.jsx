@@ -116,7 +116,7 @@ function Login() {
                 <BrainIcon size={20} />
               </div>
               <div>
-                <strong>Clinical AI Symptom Triage</strong>
+                <strong>Clinical Symptom Triage</strong>
                 <p>Intelligent specialty matching before scheduling consultations.</p>
               </div>
             </div>

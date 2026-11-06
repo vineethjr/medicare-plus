@@ -103,7 +103,7 @@ function DoctorRecommendation() {
           </div>
 
           <div>
-            <span className="hero-label">CLINICAL AI TRIAGE ENGINE</span>
+            <span className="hero-label">CLINICAL SYMPTOM TRIAGE ENGINE</span>
             <h1>Find the Right Medical Specialist</h1>
             <p>
               Describe your current symptoms or discomfort. MediCare+ analyzes your symptoms
@@ -174,7 +174,7 @@ function DoctorRecommendation() {
                 <SparklesIcon size={20} />
               </div>
               <div className="result-title-group">
-                <span className="result-engine-tag">CLINICAL AI MATCH VERIFIED</span>
+                <span className="result-engine-tag">CLINICAL MATCH VERIFIED</span>
                 <h2>Recommended Medical Department</h2>
               </div>
               <div className="result-match-score">
@@ -220,7 +220,7 @@ function DoctorRecommendation() {
 
             <div className="recommendation-note">
               <strong>Clinical Disclaimer:</strong>
-              This automated AI assessment provides preliminary specialty routing and does not replace emergency medical treatment.
+              This automated symptom assessment provides preliminary specialty routing and does not replace emergency medical treatment.
             </div>
 
             <button className="find-doctors-button" onClick={handleFindDoctors}>
