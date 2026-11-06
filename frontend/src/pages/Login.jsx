@@ -29,11 +29,6 @@ function Login() {
     });
   }
 
-  function fillDemo(email, pass) {
-    setFormData({ email, password: pass });
-    setError("");
-  }
-
   async function handleSubmit(event) {
     event.preventDefault();
 
@@ -156,69 +151,6 @@ function Login() {
             <p className="login-subtitle">
               Enter your credentials to access your appointments and medical records.
             </p>
-          </div>
-
-          {/* QUICK DEMO CREDENTIALS SHORTCUTS */}
-          <div className="demo-credentials-hud" style={{
-            background: "rgba(45, 212, 191, 0.06)",
-            border: "1px solid rgba(45, 212, 191, 0.2)",
-            borderRadius: "12px",
-            padding: "12px",
-            marginBottom: "18px"
-          }}>
-            <div style={{ fontSize: "11px", fontWeight: "700", color: "#2dd4bf", letterSpacing: "0.05em", marginBottom: "8px" }}>
-              QUICK TEST ACCOUNTS:
-            </div>
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => fillDemo("admin@medicare.com", "Admin123!")}
-                style={{
-                  padding: "5px 10px",
-                  fontSize: "11px",
-                  fontWeight: "700",
-                  background: "rgba(16, 185, 129, 0.2)",
-                  border: "1px solid #10b981",
-                  borderRadius: "6px",
-                  color: "#6ee7b7",
-                  cursor: "pointer"
-                }}
-              >
-                🛡️ Admin Panel
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo("sarah.jenkins@medicare.com", "Doctor123!")}
-                style={{
-                  padding: "5px 10px",
-                  fontSize: "11px",
-                  fontWeight: "600",
-                  background: "rgba(14, 165, 233, 0.15)",
-                  border: "1px solid rgba(14, 165, 233, 0.4)",
-                  borderRadius: "6px",
-                  color: "#7dd3fc",
-                  cursor: "pointer"
-                }}
-              >
-                🩺 Doctor
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo("vineethjrbusiness@gmail.com", "Doctor123!")}
-                style={{
-                  padding: "5px 10px",
-                  fontSize: "11px",
-                  fontWeight: "600",
-                  background: "rgba(255, 255, 255, 0.06)",
-                  border: "1px solid rgba(255, 255, 255, 0.15)",
-                  borderRadius: "6px",
-                  color: "#e2e8f0",
-                  cursor: "pointer"
-                }}
-              >
-                👤 Patient
-              </button>
-            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="login-form">
