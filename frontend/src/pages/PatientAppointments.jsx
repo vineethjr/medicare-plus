@@ -19,7 +19,9 @@ import {
   SparklesIcon,
   VideoIcon,
   XIcon,
+  StarIcon,
 } from "../components/Icons";
+import RatingModal from "../components/RatingModal";
 import { API_URL } from "../config";
 
 function readUser() {
@@ -48,6 +50,9 @@ function PatientAppointments() {
   const [chatLoading, setChatLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [chatError, setChatError] = useState("");
+
+  // Rating & review modal state
+  const [ratingModalAppointment, setRatingModalAppointment] = useState(null);
 
   // Payment checkout modal state
   const [payAppointment, setPayAppointment] = useState(null);
@@ -107,6 +112,23 @@ function PatientAppointments() {
 
     return () => clearInterval(timer);
   }, [fetchAppointments]);
+
+
+  function handleReviewSubmitted(newReview) {
+    setAppointments((prev) =>
+      prev.map((a) =>
+        a.id === newReview.appointment_id
+          ? {
+              ...a,
+              review_id: newReview.id,
+              review_rating: newReview.rating,
+              review_comment: newReview.review_text,
+              review_created_at: newReview.created_at,
+            }
+          : a
+      )
+    );
+  }
 
   // Chat messages polling
   const fetchMessages = useCallback(async () => {
@@ -690,9 +712,31 @@ function PatientAppointments() {
               )}
 
               {status === "Completed" && (
-                <p className="completed-consultation" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <CheckCircleIcon size={15} /> Consultation completed. View your diagnosis and prescriptions in Medical Records.
-                </p>
+                <div className="completed-consultation-box">
+                  <p className="completed-consultation" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <CheckCircleIcon size={15} /> Consultation completed. View your diagnosis and prescriptions in Medical Records.
+                  </p>
+                  {appointment.review_id ? (
+                    <div className="appointment-patient-review-card">
+                      <div className="review-card-header">
+                        <div className="review-stars-display">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <StarIcon
+                              key={s}
+                              size={14}
+                              className={s <= appointment.review_rating ? "star-active" : "star-dim"}
+                            />
+                          ))}
+                          <span className="review-rating-num">{appointment.review_rating}.0 / 5.0</span>
+                        </div>
+                        <span className="review-badge-verified">Your Verified Review</span>
+                      </div>
+                      {appointment.review_comment && (
+                        <p className="review-comment-quote">&ldquo;{appointment.review_comment}&rdquo;</p>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
               )}
 
               {status === "Cancelled" && (
@@ -702,6 +746,15 @@ function PatientAppointments() {
               )}
 
               <div className="patient-appointment-actions">
+                {status === "Completed" && !appointment.review_id && (
+                  <button
+                    className="patient-rate-review-button"
+                    onClick={() => setRatingModalAppointment(appointment)}
+                  >
+                    <StarIcon size={15} />
+                    <span>Rate & Review Doctor</span>
+                  </button>
+                )}
                 {canChat && (
                   <button
                     className="patient-chat-button"
@@ -1267,6 +1320,15 @@ function PatientAppointments() {
             </form>
           </section>
         </div>
+      )}
+      {/* RATING & REVIEW MODAL */}
+      {ratingModalAppointment && (
+        <RatingModal
+          isOpen={!!ratingModalAppointment}
+          onClose={() => setRatingModalAppointment(null)}
+          appointment={ratingModalAppointment}
+          onSuccess={handleReviewSubmitted}
+        />
       )}
     </div>
   );

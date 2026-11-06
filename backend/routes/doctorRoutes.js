@@ -324,8 +324,25 @@ router.get("/", protect, (req, res) => {
       docsByDoctor[doc.doctor_id].push(doc);
     }
 
+    // Fetch review aggregates for all doctors
+    const reviewStatsList = db.prepare(`
+      SELECT
+        doctor_id,
+        ROUND(AVG(rating), 1) AS avg_rating,
+        COUNT(*) AS review_count
+      FROM reviews
+      GROUP BY doctor_id
+    `).all();
+
+    const reviewMap = {};
+    for (const r of reviewStatsList) {
+      reviewMap[r.doctor_id] = r;
+    }
+
     const doctorsWithDocs = doctors.map((doc) => ({
       ...doc,
+      avg_rating: reviewMap[doc.id] ? reviewMap[doc.id].avg_rating : null,
+      review_count: reviewMap[doc.id] ? reviewMap[doc.id].review_count : 0,
       documents: docsByDoctor[doc.id] || [],
     }));
 
@@ -396,8 +413,30 @@ router.get("/verify/:id", (req, res) => {
       )
       .all(doctor.id);
 
+    const doctorReviews = db.prepare(`
+      SELECT
+        r.id,
+        r.rating,
+        r.review_text,
+        r.created_at,
+        u.name AS patient_name,
+        a.consultation_mode
+      FROM reviews r
+      JOIN users u ON r.patient_id = u.id
+      JOIN appointments a ON r.appointment_id = a.id
+      WHERE r.doctor_id = ?
+      ORDER BY r.created_at DESC
+    `).all(doctor.id);
+
+    const revAvg = doctorReviews.length > 0
+      ? (doctorReviews.reduce((sum, r) => sum + r.rating, 0) / doctorReviews.length).toFixed(1)
+      : null;
+
     res.json({
       ...doctor,
+      avg_rating: revAvg ? parseFloat(revAvg) : null,
+      review_count: doctorReviews.length,
+      reviews: doctorReviews,
       documents: documents || [],
       verified_at: doctor.verified_at || new Date().toISOString(),
       registry_seal: `MEDICARE-AUTH-${doctor.id}-${(doctor.medical_license || "REG").replace(/[^a-zA-Z0-9]/g, "")}`,

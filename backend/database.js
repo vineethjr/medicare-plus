@@ -336,6 +336,35 @@ db.exec(`
 `);
 
 // ========================================
+// PATIENT REVIEWS & RATINGS TABLE
+// ========================================
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    appointment_id INTEGER NOT NULL UNIQUE,
+    patient_id INTEGER NOT NULL,
+    doctor_id INTEGER NOT NULL,
+    rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+    review_text TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (doctor_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_reviews_doctor
+  ON reviews(doctor_id)
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_reviews_appointment
+  ON reviews(appointment_id)
+`);
+
+// ========================================
 // INITIAL SEED DATA
 // ========================================
 
@@ -602,6 +631,52 @@ function seedInitialDataIfEmpty() {
         new Date().toISOString()
       );
       console.log("Seeded Flagged Fraud Doctor: Arthur Vance");
+    }
+
+    // Seed Sample Reviews for Verified Doctors if reviews table is empty
+    const reviewCount = db.prepare("SELECT COUNT(*) AS count FROM reviews").get().count;
+    if (reviewCount === 0) {
+      let demoPatient = db.prepare("SELECT id FROM users WHERE role = 'patient' LIMIT 1").get();
+      if (!demoPatient) {
+        const patientPassword = bcrypt.hashSync("Patient123!", 10);
+        const resPatient = db.prepare(`
+          INSERT INTO users (name, email, password, role, age, gender, blood_group, emergency_contact_phone)
+          VALUES (?, ?, ?, 'patient', 32, 'Female', 'O+', '+1-555-0192')
+        `).run("Priya Sharma", "priya@medicare.com", patientPassword);
+        demoPatient = { id: resPatient.lastInsertRowid };
+      }
+
+      const raju = db.prepare("SELECT id FROM users WHERE email = ?").get("raju@medicare.com");
+      const jenkins = db.prepare("SELECT id FROM users WHERE email = ?").get("sarah.jenkins@medicare.com");
+
+      if (raju && demoPatient) {
+        const appt1 = db.prepare(`
+          INSERT INTO appointments (
+            patient_id, doctor_id, appointment_date, appointment_time, symptoms, status,
+            consultation_mode, payment_status, payment_amount, paid_at, consultation_ended_at
+          ) VALUES (?, ?, '2026-11-01', '10:00 AM', 'Persistent seasonal allergies and mild rhinitis', 'Completed', 'Online', 'Paid', 500, datetime('now', '-5 days'), datetime('now', '-5 days'))
+        `).run(demoPatient.id, raju.id);
+
+        db.prepare(`
+          INSERT INTO reviews (appointment_id, patient_id, doctor_id, rating, review_text, created_at)
+          VALUES (?, ?, ?, ?, ?, datetime('now', '-5 days'))
+        `).run(appt1.lastInsertRowid, demoPatient.id, raju.id, 5, "Dr. Raju was exceptionally thorough and polite during our telehealth session. His diagnosis was spot on and my symptoms cleared up within 48 hours!");
+      }
+
+      if (jenkins && demoPatient) {
+        const appt2 = db.prepare(`
+          INSERT INTO appointments (
+            patient_id, doctor_id, appointment_date, appointment_time, symptoms, status,
+            consultation_mode, payment_status, payment_amount, paid_at, consultation_ended_at
+          ) VALUES (?, ?, '2026-10-28', '02:30 PM', 'Routine cardiovascular screening and lipid evaluation', 'Completed', 'Offline', 'Paid', 800, datetime('now', '-8 days'), datetime('now', '-8 days'))
+        `).run(demoPatient.id, jenkins.id);
+
+        db.prepare(`
+          INSERT INTO reviews (appointment_id, patient_id, doctor_id, rating, review_text, created_at)
+          VALUES (?, ?, ?, ?, ?, datetime('now', '-8 days'))
+        `).run(appt2.lastInsertRowid, demoPatient.id, jenkins.id, 5, "Outstanding clinical experience at the clinic! Dr. Jenkins carefully explained my ECG and cardiovascular health metrics. Highly recommend.");
+      }
+      console.log("Seeded initial verified patient reviews for Dr. Raju and Dr. Jenkins.");
     }
 
     console.log("Database checked and seeded with admin and verified/pending/fraud doctors.");

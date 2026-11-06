@@ -90,6 +90,18 @@ function FindDoctor() {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [verifyingDoctor, setVerifyingDoctor] = useState(null);
   const [inspectingDoc, setInspectingDoc] = useState(null);
+  const [doctorReviewsData, setDoctorReviewsData] = useState(null);
+
+  useEffect(() => {
+    if (verifyingDoctor?.id) {
+      fetch(`${API_URL}/reviews/doctor/${verifyingDoctor.id}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => setDoctorReviewsData(data))
+        .catch(() => setDoctorReviewsData(null));
+    } else {
+      setDoctorReviewsData(null);
+    }
+  }, [verifyingDoctor]);
 
   // Profile completion enforcement state
   const [patientProfile, setPatientProfile] = useState(null);
@@ -623,11 +635,22 @@ function FindDoctor() {
                   </span>
                   <div className="doctor-rating-pill">
                     <div style={{ display: "flex", gap: "2px", color: "#f59e0b" }}>
-                      {[...Array(5)].map((_, i) => (
-                        <StarIcon key={i} size={12} />
-                      ))}
+                      {[...Array(5)].map((_, i) => {
+                        const isFilled = i < Math.round(doctor.avg_rating || 5);
+                        return (
+                          <StarIcon
+                            key={i}
+                            size={12}
+                            style={{ color: isFilled ? "#f59e0b" : "#334155" }}
+                          />
+                        );
+                      })}
                     </div>
-                    <span>4.9 (180+ reviews)</span>
+                    <span>
+                      {doctor.review_count > 0
+                        ? `${doctor.avg_rating || 5.0} (${doctor.review_count} review${doctor.review_count > 1 ? "s" : ""})`
+                        : "5.0 (New)"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1074,6 +1097,52 @@ function FindDoctor() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              {/* PATIENT REVIEWS & RATINGS SECTION */}
+              <div className="verify-section">
+                <div className="verify-section-header">
+                  <h3>Patient Reviews & Clinical Ratings</h3>
+                  <span className="doc-count-pill" style={{ color: "#f59e0b", borderColor: "rgba(245, 158, 11, 0.4)" }}>
+                    ⭐ {doctorReviewsData ? doctorReviewsData.averageRating || "5.0" : verifyingDoctor.avg_rating || "5.0"} ({doctorReviewsData ? doctorReviewsData.totalReviews : verifyingDoctor.review_count || 0})
+                  </span>
+                </div>
+
+                {doctorReviewsData && doctorReviewsData.reviews && doctorReviewsData.reviews.length > 0 ? (
+                  <div className="verify-reviews-list">
+                    {doctorReviewsData.reviews.map((rev) => (
+                      <div className="verify-review-item" key={rev.id}>
+                        <div className="verify-review-top">
+                          <div className="patient-review-author">
+                            <span className="author-avatar">{rev.patient_display_name ? rev.patient_display_name[0] : "P"}</span>
+                            <div>
+                              <strong>{rev.patient_display_name || "Verified Patient"}</strong>
+                              <span className="review-meta-mode">
+                                {rev.consultation_mode === "Online" ? "Telehealth Consultation" : "In-Person Clinic Visit"} • {rev.appointment_date || "Recent"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="review-star-pills">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <StarIcon key={s} size={13} style={{ color: s <= rev.rating ? "#f59e0b" : "#334155" }} />
+                            ))}
+                          </div>
+                        </div>
+                        {rev.review_text && (
+                          <p className="verify-review-text">&ldquo;{rev.review_text}&rdquo;</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-cert-notice">
+                    <StarIcon size={22} style={{ color: "#f59e0b" }} />
+                    <div>
+                      <strong>No Patient Reviews Yet</strong>
+                      <p>This doctor currently has no submitted patient reviews. Be the first to consult and review!</p>
+                    </div>
                   </div>
                 )}
               </div>

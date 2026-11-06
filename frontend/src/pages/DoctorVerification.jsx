@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
   ShieldCheckIcon,
+  StarIcon,
   CheckCircleIcon,
   HospitalIcon,
   AwardIcon,
@@ -283,6 +284,12 @@ export default function DoctorVerification() {
               {/* STATS & ATTRIBUTES GRID */}
               <div className="doc-stats-grid">
                 <div className="doc-stat-box">
+                  <span className="stat-label">Patient Rating</span>
+                  <strong className="stat-value text-amber" style={{ color: "#fbbf24", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <StarIcon size={16} /> {doctor.avg_rating ? `${doctor.avg_rating} / 5.0` : "5.0 (New)"} ({doctor.review_count || 0})
+                  </strong>
+                </div>
+                <div className="doc-stat-box">
                   <span className="stat-label">Qualifications</span>
                   <strong className="stat-value text-teal">{doctor.qualification || "MBBS"}</strong>
                 </div>
@@ -311,6 +318,50 @@ export default function DoctorVerification() {
                 <div className="doc-bio-section">
                   <h3>Clinical Background & Scope of Practice</h3>
                   <p>{doctor.bio}</p>
+                </div>
+              )}
+
+              {/* VERIFIED PATIENT REVIEWS */}
+              {doctor.reviews && doctor.reviews.length > 0 && (
+                <div className="doc-documents-section" style={{ marginBottom: "2rem" }}>
+                  <div className="docs-header">
+                    <div>
+                      <h3>Verified Patient Reviews</h3>
+                      <p>Genuine clinical ratings from completed patient consultations</p>
+                    </div>
+                    <span className="docs-count-pill" style={{ color: "#fbbf24", borderColor: "rgba(245, 158, 11, 0.4)" }}>
+                      ⭐ {doctor.avg_rating || "5.0"} ({doctor.reviews.length})
+                    </span>
+                  </div>
+                  <div className="doc-documents-grid">
+                    {doctor.reviews.map((rev) => (
+                      <div className="doc-card" key={rev.id} style={{ borderColor: "rgba(245, 158, 11, 0.25)" }}>
+                        <div className="doc-card-top">
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#0d9488", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700 }}>
+                              {rev.patient_name ? rev.patient_name[0] : "P"}
+                            </div>
+                            <div>
+                              <strong style={{ fontSize: "0.88rem", color: "#f8fafc" }}>{rev.patient_name || "Verified Patient"}</strong>
+                              <span style={{ display: "block", fontSize: "0.72rem", color: "#64748b" }}>
+                                {rev.consultation_mode === "Online" ? "Telehealth Consultation" : "In-Person Clinic Visit"}
+                              </span>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: "2px", color: "#f59e0b" }}>
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <StarIcon key={s} size={13} style={{ color: s <= rev.rating ? "#f59e0b" : "#334155" }} />
+                            ))}
+                          </div>
+                        </div>
+                        {rev.review_text && (
+                          <p style={{ fontStyle: "italic", fontSize: "0.82rem", color: "#cbd5e1", margin: "8px 0 0", lineHeight: 1.4 }}>
+                            &ldquo;{rev.review_text}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

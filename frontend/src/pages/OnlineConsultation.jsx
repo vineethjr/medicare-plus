@@ -666,7 +666,8 @@ function OnlineConsultation() {
         }).catch(() => {});
         navigate("/doctor-dashboard");
       } else {
-        navigate("/patient-dashboard");
+        // Prompt patient to rate doctor before exiting
+        setShowRatingModal(true);
       }
     }
   }
@@ -1382,6 +1383,29 @@ function OnlineConsultation() {
           </aside>
         )}
       </div>
+      {/* PATIENT POST-CONSULTATION RATING & REVIEW MODAL */}
+      {!isDoctor && showRatingModal && appointment && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={() => {
+            setShowRatingModal(false);
+            navigate("/patient-appointments");
+          }}
+          appointment={{
+            id: appointment.id,
+            doctor_id: appointment.doctor_id,
+            doctor_name: otherPersonName || appointment.doctor_name,
+            specialization: appointment.specialization,
+            consultation_mode: "Online",
+            appointment_date: appointment.appointment_date,
+          }}
+          onSuccess={() => {
+            setShowRatingModal(false);
+            navigate("/patient-appointments");
+          }}
+          canSkip={true}
+        />
+      )}
     </div>
   );
 }

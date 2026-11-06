@@ -38,6 +38,7 @@ const recommendationRoutes = require("./routes/recommendationRoutes");
 const consultationRoutes = require("./routes/consultationRoutes");
 const patientRoutes = require("./routes/patientRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/doctors", doctorRoutes);
@@ -46,6 +47,7 @@ app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/consultations", consultationRoutes);
 app.use("/api/patient", patientRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 const fs = require("fs");
 

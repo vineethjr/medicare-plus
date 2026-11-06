@@ -18,6 +18,7 @@ import {
   PillIcon,
   SettingsIcon,
   ShieldCheckIcon,
+  StarIcon,
   SparklesIcon,
   UserIcon,
   VideoIcon,
@@ -367,6 +368,23 @@ function DoctorDashboard() {
               Appointments awaiting your slot confirmation
             </div>
             <div className="stat-bar orange"></div>
+          </div>
+
+          {/* PATIENT REPUTATION RATING */}
+          <div className="stat-card">
+            <div className="stat-card-top">
+              <span className="stat-label">PATIENT REPUTATION</span>
+              <div className="stat-icon orange" style={{ color: "#f59e0b", background: "rgba(245, 158, 11, 0.12)" }}>
+                <StarIcon size={18} />
+              </div>
+            </div>
+            <div className="stat-number" style={{ color: "#fbbf24" }}>
+              {loading ? "..." : stats.averageRating ? `${stats.averageRating} ★` : "5.0 ★"}
+            </div>
+            <div className="stat-subtext">
+              {stats.totalReviews || 0} verified patient review{stats.totalReviews === 1 ? "" : "s"}
+            </div>
+            <div className="stat-bar" style={{ background: "#f59e0b" }}></div>
           </div>
         </section>
 

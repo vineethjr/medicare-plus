@@ -1359,3 +1359,87 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Patient Rating & Review Action Buttons & Review Card */
+.patient-rate-review-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.25) 100%);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.15);
+}
+
+.patient-rate-review-button:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.35) 100%);
+  border-color: #fbbf24;
+  color: #fef3c7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25);
+}
+
+.appointment-patient-review-card {
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.review-stars-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.review-stars-display .star-active {
+  color: #f59e0b;
+}
+
+.review-stars-display .star-dim {
+  color: #334155;
+}
+
+.review-rating-num {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #f59e0b;
+  margin-left: 5px;
+}
+
+.review-badge-verified {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(45, 212, 191, 0.12);
+  color: #2dd4bf;
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  letter-spacing: 0.02em;
+}
+
+.review-comment-quote {
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  font-style: italic;
+  margin: 2px 0 0;
+  line-height: 1.4;
+}
