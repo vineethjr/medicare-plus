@@ -37,6 +37,7 @@ const appointmentRoutes = require("./routes/appointmentRoutes");
 const recommendationRoutes = require("./routes/recommendationRoutes");
 const consultationRoutes = require("./routes/consultationRoutes");
 const patientRoutes = require("./routes/patientRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/doctors", doctorRoutes);
@@ -44,6 +45,7 @@ app.use("/api/appointments", appointmentRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/consultations", consultationRoutes);
 app.use("/api/patient", patientRoutes);
+app.use("/api/admin", adminRoutes);
 
 const fs = require("fs");
 
@@ -216,12 +218,20 @@ io.on("connection", (socket) => {
 // START SERVER
 // ========================================
 
-server.listen(PORT, () => {
-  console.log(
-    `MediCare+ backend running on port ${PORT}`
-  );
+const startListening = () => {
+  server.listen(PORT, () => {
+    console.log(
+      `MediCare+ backend running on port ${PORT}`
+    );
 
-  console.log(
-    "Socket.IO signaling server running"
-  );
-});
+    console.log(
+      "Socket.IO signaling server running"
+    );
+  });
+};
+
+if (require.main === module) {
+  startListening();
+}
+
+module.exports = { app, server };

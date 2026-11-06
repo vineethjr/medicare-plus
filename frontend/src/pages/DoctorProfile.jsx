@@ -54,6 +54,9 @@ function DoctorProfile() {
     bio: "",
     availability: "",
     medical_license: "",
+    verification_status: "Pending",
+    admin_notes: "",
+    verified_at: null,
   });
 
   const [documents, setDocuments] = useState([]);
@@ -114,6 +117,9 @@ function DoctorProfile() {
           bio: data.bio || "",
           availability: data.availability || "",
           medical_license: data.medical_license || "",
+          verification_status: data.verification_status || "Pending",
+          admin_notes: data.admin_notes || "",
+          verified_at: data.verified_at || null,
         });
 
         setDocuments(Array.isArray(data.documents) ? data.documents : []);
@@ -474,9 +480,23 @@ function DoctorProfile() {
           </div>
 
           <div className="doc-header-actions">
-            <span className="registry-verified-pill">
-              <CheckCircleIcon size={14} /> Verified Registry Active
-            </span>
+            {formData.verification_status === "Verified" ? (
+              <span className="registry-verified-pill" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.4)" }}>
+                <CheckCircleIcon size={14} /> Verified Genuine Badge Active
+              </span>
+            ) : formData.verification_status === "Fraud" ? (
+              <span className="registry-verified-pill" style={{ background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.5)" }}>
+                <AlertCircleIcon size={14} /> Flagged Suspicious / Imposter Alert
+              </span>
+            ) : formData.verification_status === "Rejected" ? (
+              <span className="registry-verified-pill" style={{ background: "rgba(148, 163, 184, 0.2)", color: "#cbd5e1", border: "1px solid rgba(148, 163, 184, 0.4)" }}>
+                <XIcon size={14} /> Verification Rejected
+              </span>
+            ) : (
+              <span className="registry-verified-pill" style={{ background: "rgba(245, 158, 11, 0.15)", color: "#fbbf24", border: "1px solid rgba(245, 158, 11, 0.4)" }}>
+                <ClockIcon size={14} /> Pending Admin Verification
+              </span>
+            )}
             <button
               className="doc-back-dash-btn"
               onClick={() => navigate("/doctor-dashboard")}
@@ -507,6 +527,22 @@ function DoctorProfile() {
           </div>
         )}
 
+        {formData.admin_notes && (
+          <div className="doc-alert-banner" style={{
+            background: formData.verification_status === "Fraud" ? "rgba(239, 68, 68, 0.15)" : formData.verification_status === "Verified" ? "rgba(16, 185, 129, 0.15)" : "rgba(14, 165, 233, 0.15)",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+            color: "#f8fafc",
+            marginBottom: "20px"
+          }}>
+            <ShieldCheckIcon size={20} className={formData.verification_status === "Fraud" ? "text-red" : "text-teal"} />
+            <div>
+              <strong style={{ display: "block", fontSize: "12px", letterSpacing: "0.05em", color: formData.verification_status === "Fraud" ? "#f87171" : "#2dd4bf" }}>
+                OFFICIAL ADMINISTRATOR AUDIT REMARKS:
+              </strong>
+              <p style={{ margin: "2px 0 0 0", fontSize: "13px", lineHeight: 1.4 }}>{formData.admin_notes}</p>
+            </div>
+          </div>
+        )}
         {/* LIVE PATIENT PREVIEW BANNER */}
         <section className="doc-preview-card">
           <div className="preview-card-inner">
@@ -518,9 +554,19 @@ function DoctorProfile() {
             <div className="preview-info">
               <div className="preview-title-row">
                 <h2>Dr. {user.name || "Doctor Name"}</h2>
-                <span className="preview-verified-badge">
-                  <ShieldCheckIcon size={13} /> MediCare+ Verified
-                </span>
+                {formData.verification_status === "Verified" ? (
+                  <span className="preview-verified-badge" style={{ background: "rgba(16, 185, 129, 0.2)", color: "#34d399", borderColor: "#10b981" }}>
+                    <ShieldCheckIcon size={13} /> Verified Genuine Practitioner
+                  </span>
+                ) : formData.verification_status === "Fraud" ? (
+                  <span className="preview-verified-badge" style={{ background: "rgba(239, 68, 68, 0.25)", color: "#f87171", borderColor: "#ef4444" }}>
+                    <AlertCircleIcon size={13} /> Suspended / Fraud Alert
+                  </span>
+                ) : (
+                  <span className="preview-verified-badge" style={{ background: "rgba(245, 158, 11, 0.2)", color: "#fbbf24", borderColor: "#f59e0b" }}>
+                    <ClockIcon size={13} /> Verification Pending Review
+                  </span>
+                )}
                 {formData.medical_license && (
                   <span className="preview-license-tag">
                     Reg No: {formData.medical_license}

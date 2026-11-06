@@ -299,6 +299,14 @@ function FindDoctor() {
 
   // Open booking form
   function openBookingForm(doctor) {
+    if (doctor.verification_status === "Fraud") {
+      alert("PATIENT SAFETY WARNING: This practitioner has been flagged for inauthentic credentials or suspected fraud by MediCare+ Administration. Consultations are suspended to protect patients.");
+      return;
+    }
+    if (doctor.verification_status === "Rejected") {
+      alert("Notice: This practitioner's credentials did not pass verification compliance. Appointment scheduling is disabled.");
+      return;
+    }
     if (user.role === "patient" && isProfileIncomplete) {
       setAttemptedDoctor(doctor);
       setShowIncompleteProfileModal(true);
@@ -592,9 +600,23 @@ function FindDoctor() {
                 <div className="doctor-card-header-info">
                   <div className="doctor-name-row">
                     <h2>Dr. {doctor.name}</h2>
-                    <span className="verified-badge-mini">
-                      <CheckCircleIcon size={12} /> Verified
-                    </span>
+                    {doctor.verification_status === "Verified" ? (
+                      <span className="verified-badge-mini verified" title="Verified Genuine Specialist">
+                        <ShieldCheckIcon size={12} /> Verified Genuine
+                      </span>
+                    ) : doctor.verification_status === "Fraud" ? (
+                      <span className="verified-badge-mini fraud" title="Flagged for suspicious or forged credentials">
+                        <AlertCircleIcon size={12} /> Flagged Fraud
+                      </span>
+                    ) : doctor.verification_status === "Rejected" ? (
+                      <span className="verified-badge-mini rejected" title="Credentials rejected by administrator">
+                        <XIcon size={12} /> Unverified
+                      </span>
+                    ) : (
+                      <span className="verified-badge-mini pending" title="Under administrative credential verification">
+                        <ClockIcon size={12} /> Verification Pending
+                      </span>
+                    )}
                   </div>
                   <span className="doctor-specialization">
                     {doctor.specialization || "General Physician"}
@@ -657,10 +679,11 @@ function FindDoctor() {
 
                 <button
                   type="button"
-                  className="consult-btn"
+                  className={`consult-btn ${doctor.verification_status === "Fraud" || doctor.verification_status === "Rejected" ? "disabled-fraud" : ""}`}
                   onClick={() => openBookingForm(doctor)}
+                  disabled={doctor.verification_status === "Fraud"}
                 >
-                  <span>Book Appointment</span>
+                  <span>{doctor.verification_status === "Fraud" ? "Suspended (Fraud Alert)" : doctor.verification_status === "Rejected" ? "Unverified" : "Book Appointment"}</span>
                   <ArrowRightIcon size={15} />
                 </button>
               </div>
@@ -940,9 +963,19 @@ function FindDoctor() {
                 <div className="verify-title-meta">
                   <div className="verify-name-row">
                     <h2>Dr. {verifyingDoctor.name}</h2>
-                    <span className="verified-shield-tag">
-                      <ShieldCheckIcon size={14} /> MediCare+ Verified Registry
+                    {verifyingDoctor.verification_status === "Verified" ? (
+                    <span className="verified-shield-tag" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.4)" }}>
+                      <ShieldCheckIcon size={14} /> Verified Genuine Registry
                     </span>
+                  ) : verifyingDoctor.verification_status === "Fraud" ? (
+                    <span className="verified-shield-tag" style={{ background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.5)" }}>
+                      <AlertCircleIcon size={14} /> FLAGGED AS FRAUD / SUSPENDED
+                    </span>
+                  ) : (
+                    <span className="verified-shield-tag" style={{ background: "rgba(245, 158, 11, 0.15)", color: "#fbbf24", border: "1px solid rgba(245, 158, 11, 0.4)" }}>
+                      <ClockIcon size={14} /> Under Administrative Review
+                    </span>
+                  )}
                   </div>
                   <span className="verify-spec">
                     {verifyingDoctor.specialization || "General Physician"} • {verifyingDoctor.qualification || "MBBS"}

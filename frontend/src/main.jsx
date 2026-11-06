@@ -18,6 +18,7 @@ import DoctorMedicalRecords from "./pages/DoctorMedicalRecords";
 import OnlineConsultation from "./pages/OnlineConsultation";
 import PatientProfile from "./pages/PatientProfile";
 import DoctorVerification from "./pages/DoctorVerification";
+import AdminDashboard from "./pages/AdminDashboard";
 
 import "./index.css";
 
@@ -42,51 +43,58 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         />
         <Route path="/find-doctor" element={<FindDoctor />} />
         <Route
-  path="/doctor-appointments"
-  element={<DoctorAppointments />}
-/>
-<Route
-  path="/patient-appointments"
-  element={<PatientAppointments />}
-/>
-<Route
-  path="/doctor-recommendation"
-  element={<DoctorRecommendation />}
-/>
-<Route
-  path="/doctor-consultation"
-  element={<DoctorConsultation />}
-/>
-<Route
-  path="/patient-medical-records"
-  element={<PatientMedicalRecords />}
-/>
-<Route
-  path="/doctor-medical-records"
-  element={<DoctorMedicalRecords />}
-/>
-<Route
-  path="/online-consultation/:appointmentId"
-  element={<OnlineConsultation />}
-/>
-<Route
-  path="/consultation/:appointmentId"
-  element={<OnlineConsultation />}
-/>
-<Route
-  path="/patient-profile"
-  element={<PatientProfile />}
-/>
-<Route
-  path="/verify-doctor/:id"
-  element={<DoctorVerification />}
-/>
-<Route
-  path="/verify/doctor/:id"
-  element={<DoctorVerification />}
-/>
+          path="/doctor-appointments"
+          element={<DoctorAppointments />}
+        />
+        <Route
+          path="/patient-appointments"
+          element={<PatientAppointments />}
+        />
+        <Route
+          path="/doctor-recommendation"
+          element={<DoctorRecommendation />}
+        />
+        <Route
+          path="/doctor-consultation"
+          element={<DoctorConsultation />}
+        />
+        <Route
+          path="/patient-medical-records"
+          element={<PatientMedicalRecords />}
+        />
+        <Route
+          path="/doctor-medical-records"
+          element={<DoctorMedicalRecords />}
+        />
+        <Route
+          path="/online-consultation/:appointmentId"
+          element={<OnlineConsultation />}
+        />
+        <Route
+          path="/consultation/:appointmentId"
+          element={<OnlineConsultation />}
+        />
+        <Route
+          path="/patient-profile"
+          element={<PatientProfile />}
+        />
+        <Route
+          path="/verify-doctor/:id"
+          element={<DoctorVerification />}
+        />
+        <Route
+          path="/verify/doctor/:id"
+          element={<DoctorVerification />}
+        />
+        <Route
+          path="/admin"
+          element={<AdminDashboard />}
+        />
+        <Route
+          path="/admin-dashboard"
+          element={<AdminDashboard />}
+        />
       </Routes>
-      
     </BrowserRouter>
   </React.StrictMode>
 );

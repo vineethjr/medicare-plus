@@ -42,7 +42,7 @@ router.post("/register", async (req, res) => {
           `INSERT INTO users (
             name, email, password, role,
             specialization, qualification, hospital, consultation_fee, experience, availability, verification_status
-          ) VALUES (?, ?, ?, 'doctor', 'General Physician', 'MBBS', 'MediCare+ Clinical Center', 500, 1, 'Mon - Fri, 09:00 AM - 05:00 PM', 'Verified')`
+          ) VALUES (?, ?, ?, 'doctor', 'General Physician', 'MBBS', 'MediCare+ Clinical Center', 500, 1, 'Mon - Fri, 09:00 AM - 05:00 PM', 'Pending')`
         )
         .run(name, email, hashedPassword);
     } else {
@@ -54,7 +54,10 @@ router.post("/register", async (req, res) => {
     }
 
     res.status(201).json({
-      message: "Account created successfully",
+      message:
+        role === "doctor"
+          ? "Doctor account created! Your profile is pending verification by the admin panel."
+          : "Account created successfully",
       userId: result.lastInsertRowid,
     });
   } catch (error) {
@@ -114,6 +117,7 @@ router.post("/login", async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        verification_status: user.verification_status || (user.role === "doctor" ? "Pending" : null),
       },
     });
   } catch (error) {

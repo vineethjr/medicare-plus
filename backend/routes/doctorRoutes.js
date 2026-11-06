@@ -31,7 +31,9 @@ router.get("/profile", protect, (req, res) => {
           bio,
           availability,
           medical_license,
-          verification_status
+          verification_status,
+          admin_notes,
+          verified_at
         FROM users
         WHERE id = ? AND role = 'doctor'
         `
@@ -57,6 +59,8 @@ router.get("/profile", protect, (req, res) => {
           file_url,
           file_name,
           status,
+          admin_notes,
+          reviewed_at,
           created_at
         FROM doctor_documents
         WHERE doctor_id = ?
@@ -146,7 +150,7 @@ router.put("/profile", protect, (req, res) => {
 });
 
 /*
-  Upload / Add qualification document
+  Upload / Add qualification document (defaults to 'Pending' review)
 */
 router.post("/documents", protect, (req, res) => {
   try {
@@ -184,7 +188,7 @@ router.post("/documents", protect, (req, res) => {
           file_name,
           status
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'Verified')
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending')
         `
       )
       .run(
@@ -206,7 +210,7 @@ router.post("/documents", protect, (req, res) => {
       .get(result.lastInsertRowid);
 
     res.status(201).json({
-      message: "Qualification document uploaded and verified successfully",
+      message: "Qualification document uploaded successfully. It is queued for admin review and verification.",
       document: newDoc,
     });
   } catch (error) {
@@ -280,7 +284,9 @@ router.get("/", protect, (req, res) => {
           bio,
           availability,
           medical_license,
-          verification_status
+          verification_status,
+          admin_notes,
+          verified_at
         FROM users
         WHERE role = 'doctor'
         ORDER BY id DESC
@@ -301,6 +307,7 @@ router.get("/", protect, (req, res) => {
           file_url,
           file_name,
           status,
+          admin_notes,
           created_at
         FROM doctor_documents
         ORDER BY created_at DESC
@@ -353,6 +360,8 @@ router.get("/verify/:id", (req, res) => {
           availability,
           medical_license,
           verification_status,
+          admin_notes,
+          verified_at,
           created_at
         FROM users
         WHERE id = ? AND role = 'doctor'
@@ -375,7 +384,10 @@ router.get("/verify/:id", (req, res) => {
           document_type,
           issuer,
           issue_year,
+          file_url,
+          file_name,
           status,
+          admin_notes,
           created_at
         FROM doctor_documents
         WHERE doctor_id = ?
@@ -387,7 +399,7 @@ router.get("/verify/:id", (req, res) => {
     res.json({
       ...doctor,
       documents: documents || [],
-      verified_at: new Date().toISOString(),
+      verified_at: doctor.verified_at || new Date().toISOString(),
       registry_seal: `MEDICARE-AUTH-${doctor.id}-${(doctor.medical_license || "REG").replace(/[^a-zA-Z0-9]/g, "")}`,
     });
   } catch (error) {
@@ -399,7 +411,7 @@ router.get("/verify/:id", (req, res) => {
 });
 
 /*
-  Get single doctor with verified documents (public for verification)
+  Get single doctor with verified documents
 */
 router.get("/:id", protect, (req, res) => {
   try {
@@ -418,7 +430,9 @@ router.get("/:id", protect, (req, res) => {
           bio,
           availability,
           medical_license,
-          verification_status
+          verification_status,
+          admin_notes,
+          verified_at
         FROM users
         WHERE id = ? AND role = 'doctor'
         `
@@ -443,6 +457,7 @@ router.get("/:id", protect, (req, res) => {
           file_url,
           file_name,
           status,
+          admin_notes,
           created_at
         FROM doctor_documents
         WHERE doctor_id = ?
@@ -464,7 +479,4 @@ router.get("/:id", protect, (req, res) => {
   }
 });
 
-/*
-  Export router
-*/
 module.exports = router;

@@ -37,4 +37,17 @@ function protect(req, res, next) {
   }
 }
 
+function requireAdmin(req, res, next) {
+  protect(req, res, () => {
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({
+        message: "Access forbidden. Administrator privileges required.",
+      });
+    }
+    next();
+  });
+}
+
+protect.requireAdmin = requireAdmin;
+
 module.exports = protect;

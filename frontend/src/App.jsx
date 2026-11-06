@@ -232,6 +232,9 @@ function App() {
           <a href="#features">Platform Features</a>
           <a href="#how-it-works">How It Works</a>
           <a href="#specialties">Specialties</a>
+          <Link to="/admin" style={{ color: "#2dd4bf", fontWeight: "700", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+            <span>🛡️ Admin Panel</span>
+          </Link>
         </div>
 
         <div className="nav-actions">
@@ -870,6 +873,7 @@ function App() {
           <div className="footer-links">
             <Link to="/login">Sign In</Link>
             <Link to="/register">Create Account</Link>
+            <Link to="/admin" style={{ color: "#2dd4bf", fontWeight: "600" }}>Admin Verification Panel</Link>
             <a href="#triage-demo">AI Symptom Triage</a>
             <a href="#features">Features</a>
             <a href="#how-it-works">How It Works</a>

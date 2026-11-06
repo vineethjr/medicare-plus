@@ -181,22 +181,62 @@ export default function DoctorVerification() {
         {doctor && !loading && (
           <div className="verification-content-wrapper">
             {/* OFFICIAL VERIFICATION BANNER */}
-            <div className="official-verified-banner">
-              <div className="banner-icon-box">
-                <CheckCircleIcon size={28} />
+            {doctor.verification_status === "Fraud" ? (
+              <div className="official-verified-banner fraud" style={{ background: "rgba(239, 68, 68, 0.18)", borderColor: "rgba(239, 68, 68, 0.5)" }}>
+                <div className="banner-icon-box" style={{ background: "rgba(239, 68, 68, 0.25)", color: "#f87171" }}>
+                  <AlertCircleIcon size={28} />
+                </div>
+                <div className="banner-text">
+                  <div className="banner-tag" style={{ color: "#f87171", background: "rgba(239, 68, 68, 0.2)", borderColor: "rgba(239, 68, 68, 0.4)" }}>
+                    SECURITY ALERT: FLAGGED FOR CREDENTIAL FRAUD
+                  </div>
+                  <h2>Unaccredited / Suspended Practitioner Alert</h2>
+                  <p style={{ color: "#fca5a5" }}>
+                    {doctor.admin_notes || "MediCare+ Administration has investigated this practitioner's submitted credentials and flagged them as fraudulent or unverified. All clinical privileges and patient appointments are suspended."}
+                  </p>
+                </div>
+                <div className="banner-seal-badge" style={{ background: "#ef4444", color: "#ffffff" }}>
+                  <AlertCircleIcon size={18} />
+                  <span>REVOKED & FLAGGED</span>
+                </div>
               </div>
-              <div className="banner-text">
-                <div className="banner-tag">AUTHENTIC & VERIFIED PRACTITIONER</div>
-                <h2>Official Medical Council Registry Record</h2>
-                <p>
-                  This record is cryptographically validated and corresponds to an active, licensed healthcare specialist registered under MediCare+ Clinical Protocols.
-                </p>
+            ) : doctor.verification_status === "Pending" ? (
+              <div className="official-verified-banner pending" style={{ background: "rgba(245, 158, 11, 0.15)", borderColor: "rgba(245, 158, 11, 0.4)" }}>
+                <div className="banner-icon-box" style={{ background: "rgba(245, 158, 11, 0.25)", color: "#fbbf24" }}>
+                  <ClockIcon size={28} />
+                </div>
+                <div className="banner-text">
+                  <div className="banner-tag" style={{ color: "#fbbf24", background: "rgba(245, 158, 11, 0.2)", borderColor: "rgba(245, 158, 11, 0.4)" }}>
+                    CREDENTIAL AUDIT IN PROGRESS
+                  </div>
+                  <h2>Administrative Verification Pending</h2>
+                  <p style={{ color: "#fde68a" }}>
+                    This doctor profile and uploaded qualification certificates are currently undergoing background review by MediCare+ Administration.
+                  </p>
+                </div>
+                <div className="banner-seal-badge" style={{ background: "#f59e0b", color: "#000000" }}>
+                  <ClockIcon size={18} />
+                  <span>UNDER AUDIT</span>
+                </div>
               </div>
-              <div className="banner-seal-badge">
-                <ShieldCheckIcon size={18} />
-                <span>ACTIVE LICENSE</span>
+            ) : (
+              <div className="official-verified-banner">
+                <div className="banner-icon-box">
+                  <CheckCircleIcon size={28} />
+                </div>
+                <div className="banner-text">
+                  <div className="banner-tag">AUTHENTIC & VERIFIED PRACTITIONER</div>
+                  <h2>Official Medical Council Registry Record</h2>
+                  <p>
+                    This record is cryptographically validated and corresponds to an active, licensed healthcare specialist verified by MediCare+ Clinical Administration.
+                  </p>
+                </div>
+                <div className="banner-seal-badge">
+                  <ShieldCheckIcon size={18} />
+                  <span>ACTIVE LICENSE</span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* DOCTOR CREDENTIALS PROFILE CARD */}
             <section className="doctor-credentials-card">
@@ -209,9 +249,19 @@ export default function DoctorVerification() {
                 <div className="doc-main-meta">
                   <div className="doc-name-row">
                     <h2>Dr. {doctor.name}</h2>
-                    <span className="verified-pill">
-                      <CheckCircleIcon size={14} /> Verified Practitioner
-                    </span>
+                    {doctor.verification_status === "Verified" ? (
+                      <span className="verified-pill" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.4)" }}>
+                        <CheckCircleIcon size={14} /> Verified Genuine Practitioner
+                      </span>
+                    ) : doctor.verification_status === "Fraud" ? (
+                      <span className="verified-pill" style={{ background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.5)" }}>
+                        <AlertCircleIcon size={14} /> Flagged Imposter / Fraud
+                      </span>
+                    ) : (
+                      <span className="verified-pill" style={{ background: "rgba(245, 158, 11, 0.15)", color: "#fbbf24", border: "1px solid rgba(245, 158, 11, 0.4)" }}>
+                        <ClockIcon size={14} /> Under Review
+                      </span>
+                    )}
                   </div>
 
                   <p className="doc-specialization-text">
