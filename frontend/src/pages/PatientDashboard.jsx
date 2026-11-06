@@ -43,6 +43,14 @@ function PatientDashboard() {
   // ================================
 
   useEffect(() => {
+    if (user.role === "admin") {
+      navigate("/admin-dashboard");
+      return;
+    }
+    if (user.role === "doctor") {
+      navigate("/doctor-dashboard");
+      return;
+    }
     async function fetchStats() {
       try {
         const response = await fetch(

@@ -47,6 +47,14 @@ function DoctorDashboard() {
 
   // Fetch stats and recent appointments
   useEffect(() => {
+    if (user.role === "admin") {
+      navigate("/admin-dashboard");
+      return;
+    }
+    if (user.role === "patient") {
+      navigate("/patient-dashboard");
+      return;
+    }
     async function loadDashboardData() {
       try {
         setLoading(true);
