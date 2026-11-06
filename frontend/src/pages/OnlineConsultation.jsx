@@ -51,193 +51,7 @@ function readUser() {
 }
 
 
-/**
- * Creates an ultra-reliable, animated 30 FPS MediaStream with a cyber-clinical
- * avatar, pulsing telemetry waves, live ECG heartbeat line, and live digital clock.
- * This guarantees that Chromium's captureStream() produces continuous video frames
- * and WebRTC P2P video packets are actively transmitted without ever going black.
- */
-function createFallbackStream(userName, roleTitle) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 640;
-  canvas.height = 480;
-  const ctx = canvas.getContext("2d");
 
-  let frameCount = 0;
-  const isDoc = roleTitle ? String(roleTitle).toLowerCase().includes("doc") : false;
-
-  function drawFrame() {
-    frameCount++;
-
-    // 1. Dark cyber-clinical backdrop
-    ctx.fillStyle = "#030a0d";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // 2. Futuristic medical telemetry grid
-    ctx.strokeStyle = "rgba(45, 212, 191, 0.06)";
-    ctx.lineWidth = 1;
-    for (let x = 0; x < canvas.width; x += 32) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-    for (let y = 0; y < canvas.height; y += 32) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
-
-    // 3. Animated pulsing radar rings radiating from avatar center (320, 190)
-    const pulse1 = (frameCount * 1.5) % 90;
-    const pulse2 = (frameCount * 1.5 + 45) % 90;
-    ctx.beginPath();
-    ctx.arc(320, 190, 65 + pulse1, 0, Math.PI * 2);
-    ctx.strokeStyle = isDoc
-      ? `rgba(45, 212, 191, ${Math.max(0, 0.4 - pulse1 / 90)})`
-      : `rgba(56, 189, 248, ${Math.max(0, 0.4 - pulse1 / 90)})`;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(320, 190, 65 + pulse2, 0, Math.PI * 2);
-    ctx.strokeStyle = isDoc
-      ? `rgba(45, 212, 191, ${Math.max(0, 0.4 - pulse2 / 90)})`
-      : `rgba(56, 189, 248, ${Math.max(0, 0.4 - pulse2 / 90)})`;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // 4. Avatar circle background & glowing border
-    ctx.beginPath();
-    ctx.arc(320, 190, 65, 0, Math.PI * 2);
-    ctx.fillStyle = isDoc ? "#09252c" : "#092033";
-    ctx.fill();
-    ctx.strokeStyle = isDoc ? "#2dd4bf" : "#38bdf8";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // 5. User Initial letter
-    const initial = (userName || (isDoc ? "D" : "P")).charAt(0).toUpperCase();
-    ctx.font = "bold 52px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(initial, 320, 188);
-
-    // 6. Online Green Pulse Dot
-    const dotGlow = Math.abs(Math.sin(frameCount * 0.08)) * 3;
-    ctx.beginPath();
-    ctx.arc(366, 235, 8 + dotGlow, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(16, 185, 129, 0.35)";
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(366, 235, 7, 0, Math.PI * 2);
-    ctx.fillStyle = "#10b981";
-    ctx.fill();
-    ctx.strokeStyle = "#030a0d";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // 7. Participant Name
-    ctx.font = "bold 19px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = "#f8fafc";
-    ctx.fillText(userName || (isDoc ? "Attending Physician" : "Consultation Patient"), 320, 285);
-
-    // 8. Role Subtitle
-    ctx.font = "600 12.5px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = isDoc ? "#2dd4bf" : "#38bdf8";
-    ctx.fillText(
-      isDoc ? "PHYSICIAN • ENCRYPTED CLINICAL TELEHEALTH" : "PATIENT • LIVE SECURE CONSULTATION",
-      320,
-      308
-    );
-
-    // 9. Live moving ECG / Heartbeat waveform
-    ctx.strokeStyle = isDoc ? "#2dd4bf" : "#38bdf8";
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    const ecgY = 385;
-    const speedOffset = (frameCount * 4) % canvas.width;
-    for (let x = 0; x < canvas.width; x += 4) {
-      const relX = (x + speedOffset) % canvas.width;
-      let y = ecgY;
-      if (relX >= 270 && relX < 282) {
-        y = ecgY - 6;
-      } else if (relX >= 282 && relX < 296) {
-        y = ecgY + 28;
-      } else if (relX >= 296 && relX < 312) {
-        y = ecgY - 38; // high R-wave peak
-      } else if (relX >= 312 && relX < 326) {
-        y = ecgY + 14;
-      } else if (relX >= 326 && relX < 340) {
-        y = ecgY - 8;
-      }
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    // 10. Live telemetry stats footer
-    const now = new Date();
-    const timeStr = now.toTimeString().split(" ")[0];
-    ctx.font = "500 11.5px monospace";
-    ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
-    ctx.fillText(
-      `MEDICARE+ SECURE WEBRTC • 30 FPS LIVE • ${timeStr}`,
-      320,
-      445
-    );
-  }
-
-  // Draw first frame immediately
-  drawFrame();
-
-  // Continuously paint the canvas at 30 FPS so Chromium continuously streams video frames
-  const intervalId = setInterval(drawFrame, 1000 / 30);
-
-  let videoTrack = null;
-  try {
-    const stream = canvas.captureStream ? canvas.captureStream(30) : null;
-    if (stream) {
-      videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack._isVirtual = true;
-        videoTrack.addEventListener("ended", () => clearInterval(intervalId));
-      }
-    }
-  } catch (err) {
-    console.warn("Could not capture animated canvas stream:", err);
-  }
-
-  // Silent audio track using AudioContext
-  let audioTrack = null;
-  try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (AudioContextClass) {
-      const audioCtx = new AudioContextClass();
-      const dest = audioCtx.createMediaStreamDestination();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      gain.gain.value = 0; // completely silent
-      osc.connect(gain);
-      gain.connect(dest);
-      osc.start();
-      audioTrack = dest.stream.getAudioTracks()[0];
-      if (audioTrack) audioTrack._isVirtual = true;
-    }
-  } catch (err) {
-    console.warn("Could not create fallback audio track:", err);
-  }
-
-  const tracks = [];
-  if (videoTrack) tracks.push(videoTrack);
-  if (audioTrack) tracks.push(audioTrack);
-  const mediaStream = new MediaStream(tracks);
-  mediaStream._animationInterval = intervalId;
-  return mediaStream;
-}
 
 function OnlineConsultation() {
   const { appointmentId } = useParams();
@@ -254,8 +68,7 @@ function OnlineConsultation() {
   const [participantConnected, setParticipantConnected] = useState(false);
   const [participantCount, setParticipantCount] = useState(1);
   const [signalingStatus, setSignalingStatus] = useState("waiting");
-  const [useVirtualStream, setUseVirtualStream] = useState(true);
-  const [remoteFrameActive, setRemoteFrameActive] = useState(false);
+  
   const [showRatingModal, setShowRatingModal] = useState(false);
 
   // Active drawer tab: null (closed), 'dossier', 'prescription', 'chat'
@@ -286,7 +99,7 @@ function OnlineConsultation() {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteStreamRef = useRef(null);
-  const remoteImgRef = useRef(null);
+  
   const localStreamRef = useRef(null);
   const screenStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
@@ -493,26 +306,22 @@ function OnlineConsultation() {
 
     // Remote track reception
     pc.ontrack = (event) => {
-      console.log("WebRTC Remote track received:", event.track.kind, event.track.id);
-
-      if (!remoteStreamRef.current) {
-        remoteStreamRef.current = new MediaStream();
-      }
-
-      // If a track of this kind already exists, remove it first
-      const existing = remoteStreamRef.current.getTracks().filter((t) => t.kind === event.track.kind);
-      existing.forEach((t) => remoteStreamRef.current.removeTrack(t));
-
-      // Add the new incoming track
-      remoteStreamRef.current.addTrack(event.track);
-
-      // Re-assign srcObject to force HTMLMediaElement to start rendering the video track
+      console.log("WebRTC Remote track received:", event.track.kind);
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = remoteStreamRef.current;
+        if (event.streams && event.streams[0]) {
+          remoteVideoRef.current.srcObject = event.streams[0];
+        } else {
+          let currentStream = remoteVideoRef.current.srcObject;
+          if (!currentStream || !(currentStream instanceof MediaStream)) {
+            currentStream = new MediaStream();
+            remoteVideoRef.current.srcObject = currentStream;
+          }
+          currentStream.addTrack(event.track);
+        }
         const playPromise = remoteVideoRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch((err) => {
-            console.warn("Autoplay note - trying muted:", err);
+            console.warn("Autoplay note:", err);
             if (remoteVideoRef.current) {
               remoteVideoRef.current.muted = true;
               remoteVideoRef.current.play().catch(() => {});
@@ -520,14 +329,6 @@ function OnlineConsultation() {
           });
         }
       }
-
-      event.track.onunmute = () => {
-        console.log("Remote track unmuted and streaming:", event.track.kind);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.play().catch(() => {});
-        }
-      };
-
       setParticipantConnected(true);
       setSignalingStatus("connected");
     };
@@ -745,107 +546,55 @@ function OnlineConsultation() {
   // --------------------------------------------------
   async function startMedia() {
     setMediaError("");
-    let stream = null;
-
     try {
-      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
-      const fallback = createFallbackStream(
-        user.name || (isDoctor ? "Doctor" : "Patient"),
-        isDoctor ? "doctor" : "patient"
-      );
-
-      const tracks = [
-        ...(audioStream ? audioStream.getAudioTracks() : fallback.getAudioTracks()),
-        ...fallback.getVideoTracks(),
-      ];
-
-      stream = new MediaStream(tracks);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: true,
+      });
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.muted = true;
+        localVideoRef.current.play().catch(() => {});
+      }
       setCameraOn(true);
       setMicOn(true);
-      setUseVirtualStream(true);
-      console.log("Initialized 30 FPS Cyber Clinical Stream with audio");
-    } catch (err) {
-      console.warn("Cyber stream initialization fallback:", err);
-      stream = createFallbackStream(
-        user.name || (isDoctor ? "Doctor" : "Patient"),
-        isDoctor ? "doctor" : "patient"
-      );
-      setCameraOn(true);
-      setMicOn(false);
-      setUseVirtualStream(true);
-    }
 
-    localStreamRef.current = stream;
-
-    if (localVideoRef.current && stream) {
-      localVideoRef.current.srcObject = stream;
-      localVideoRef.current.muted = true;
-      localVideoRef.current.play().catch(() => {});
-    }
-
-    if (peerConnectionRef.current && stream) {
-      stream.getTracks().forEach((track) => {
-        try {
-          const senders = peerConnectionRef.current.getSenders();
+      if (peerConnectionRef.current) {
+        const senders = peerConnectionRef.current.getSenders();
+        stream.getTracks().forEach((track) => {
           const alreadyAdded = senders.some((s) => s.track && s.track.id === track.id);
           if (!alreadyAdded) {
             peerConnectionRef.current.addTrack(track, stream);
           }
-        } catch (e) {
-          console.warn("Error attaching track to pc:", e);
-        }
-      });
-    }
-
-    return stream;
-  }
-
-  // Switch to animated Cyber Clinical Stream (30 FPS)
-  async function switchToCyberStream() {
-    try {
-      const fallback = createFallbackStream(
-        user.name || (isDoctor ? "Doctor" : "Patient"),
-        isDoctor ? "doctor" : "patient"
-      );
-      const newVideoTrack = fallback.getVideoTracks()[0];
-      if (!newVideoTrack) return;
-
-      if (localStreamRef.current) {
-        const oldTrack = localStreamRef.current.getVideoTracks()[0];
-        if (oldTrack) {
-          oldTrack.stop();
-          localStreamRef.current.removeTrack(oldTrack);
-        }
-        localStreamRef.current.addTrack(newVideoTrack);
+        });
       }
 
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = localStreamRef.current;
-        localVideoRef.current.play().catch(() => {});
-      }
-
-      if (peerConnectionRef.current) {
-        const sender = peerConnectionRef.current
-          .getSenders()
-          .find((s) => s.track && s.track.kind === "video");
-        if (sender) {
-          await sender.replaceTrack(newVideoTrack);
-        } else if (localStreamRef.current) {
-          peerConnectionRef.current.addTrack(newVideoTrack, localStreamRef.current);
-        }
-      }
-
-      setCameraOn(true);
-      setUseVirtualStream(true);
-      setMediaError("");
-      console.log("Switched to animated Cyber Clinical Stream");
+      return stream;
     } catch (err) {
-      console.error("Error switching to cyber stream:", err);
+      console.warn("Direct video+audio capture failed:", err);
+      setMediaError("Could not access camera/mic: " + (err.message || "Please check browser permissions"));
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStreamRef.current = audioStream;
+        setCameraOn(false);
+        setMicOn(true);
+        if (peerConnectionRef.current) {
+          audioStream.getTracks().forEach((track) => {
+            peerConnectionRef.current.addTrack(track, audioStream);
+          });
+        }
+        return audioStream;
+      } catch (e2) {
+        setCameraOn(false);
+        setMicOn(false);
+        return null;
+      }
     }
   }
 
   // Hot-swap hardware camera into ongoing call
-  async function switchToHardwareCamera() {
+  async function requestCameraAccess() {
     try {
       setMediaError("");
       const newStream = await navigator.mediaDevices.getUserMedia({
@@ -861,6 +610,8 @@ function OnlineConsultation() {
           localStreamRef.current.removeTrack(oldTrack);
         }
         localStreamRef.current.addTrack(newVideoTrack);
+      } else {
+        localStreamRef.current = newStream;
       }
 
       if (localVideoRef.current) {
@@ -880,20 +631,10 @@ function OnlineConsultation() {
       }
 
       setCameraOn(true);
-      setUseVirtualStream(false);
       setMediaError("");
       console.log("Hardware camera activated and hot-swapped into consultation");
     } catch (err) {
-      setMediaError("Could not start hardware camera: " + (err.message || "Device busy"));
-      switchToCyberStream();
-    }
-  }
-
-  function toggleStreamMode() {
-    if (useVirtualStream) {
-      switchToHardwareCamera();
-    } else {
-      switchToCyberStream();
+      setMediaError("Could not start camera: " + (err.message || "Device busy"));
     }
   }
 
@@ -1007,15 +748,6 @@ function OnlineConsultation() {
         });
 
         // Single clean listeners for signaling
-        socket.on("consultation-video-frame", ({ frame }) => {
-          setParticipantConnected(true);
-          setRemoteFrameActive(true);
-          setSignalingStatus("connected");
-          if (remoteImgRef.current) {
-            remoteImgRef.current.src = frame;
-          }
-        });
-
         socket.on("webrtc-offer", handleReceiveOffer);
         socket.on("webrtc-answer", handleReceiveAnswer);
         socket.on("webrtc-ice-candidate", handleReceiveCandidate);
@@ -1024,13 +756,9 @@ function OnlineConsultation() {
           console.log("Participant left consultation");
           setParticipantCount(1);
           setParticipantConnected(false);
-          setRemoteFrameActive(false);
           setSignalingStatus("waiting");
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = null;
-          }
-          if (remoteImgRef.current) {
-            remoteImgRef.current.src = "";
           }
           if (peerConnectionRef.current) {
             peerConnectionRef.current.close();
@@ -1123,42 +851,7 @@ function OnlineConsultation() {
     };
   }, [participantConnected]);
 
-  // Guaranteed Live Frame Broadcasting over Socket.IO (Dual-Channel Relay)
-  useEffect(() => {
-    if (!appointmentId) return;
-
-    const captureCanvas = document.createElement("canvas");
-    captureCanvas.width = 480;
-    captureCanvas.height = 360;
-    const captureCtx = captureCanvas.getContext("2d");
-
-    const broadcastInterval = setInterval(() => {
-      if (!socketRef.current?.connected) return;
-
-      if (localVideoRef.current && localVideoRef.current.readyState >= 2) {
-        try {
-          captureCtx.drawImage(
-            localVideoRef.current,
-            0,
-            0,
-            captureCanvas.width,
-            captureCanvas.height
-          );
-          const frameData = captureCanvas.toDataURL("image/jpeg", 0.55);
-          socketRef.current.emit("consultation-video-frame", {
-            appointmentId,
-            frame: frameData,
-            senderRole: user.role,
-            senderName: user.name,
-          });
-        } catch (e) {
-          // ignore frame capture error
-        }
-      }
-    }, 90); // ~11 FPS, lightweight, silky smooth across all networks
-
-    return () => clearInterval(broadcastInterval);
-  }, [appointmentId, user.role, user.name]);
+  
 
   // CONTROLS
   function toggleMicrophone() {
@@ -1177,12 +870,12 @@ function OnlineConsultation() {
 
   function toggleCamera() {
     if (!localStreamRef.current) {
-      switchToHardwareCamera();
+      requestCameraAccess();
       return;
     }
     const videoTrack = localStreamRef.current.getVideoTracks()[0];
     if (!videoTrack) {
-      switchToHardwareCamera();
+      requestCameraAccess();
       return;
     }
     videoTrack.enabled = !videoTrack.enabled;
@@ -1400,26 +1093,11 @@ function OnlineConsultation() {
       <div className="telehealth-stage-container">
         {/* PRIMARY VIDEO STAGE */}
         <div className={`video-stage-main ${activeDrawer ? "with-drawer" : ""}`}>
-          {/* DUAL-CHANNEL REMOTE STREAM (LIVE FRAME STREAM + WEBRTC VIDEO) */}
-          <img
-            ref={remoteImgRef}
-            alt="Live Remote Video Stream"
-            className={`remote-stream-video ${participantConnected && remoteFrameActive ? "active" : "hidden"}`}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              position: "absolute",
-              top: 0,
-              left: 0,
-            }}
-          />
-
           <video
             ref={remoteVideoRef}
             autoPlay
             playsInline
-            className={`remote-stream-video ${participantConnected && !remoteFrameActive ? "active" : "hidden"}`}
+            className={`remote-stream-video ${participantConnected ? "active" : "hidden"}`}
           />
 
           {/* WAITING STATE HOLOGRAM RADAR */}
@@ -1534,26 +1212,7 @@ function OnlineConsultation() {
             )}
 
             <div className="pip-status-overlay">
-              <span className="pip-self-label">You ({useVirtualStream ? "Cyber Stream" : "Hardware Cam"})</span>
-              <button
-                type="button"
-                onClick={toggleStreamMode}
-                title="Switch between Hardware Camera and Cyber Clinical Live Stream"
-                style={{
-                  background: "rgba(15, 23, 42, 0.9)",
-                  border: "1px solid rgba(45, 212, 191, 0.45)",
-                  borderRadius: "4px",
-                  color: "#2dd4bf",
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  padding: "2px 6px",
-                  cursor: "pointer",
-                  marginLeft: "auto",
-                  pointerEvents: "auto",
-                }}
-              >
-                {useVirtualStream ? "📷 Hardware Cam" : "✨ Cyber Stream"}
-              </button>
+              <span className="pip-self-label">You (Self View)</span>
               <span className={`pip-mic-dot ${micOn ? "active" : "muted"}`}>
                 {micOn ? "Mic On" : "Muted"}
               </span>
@@ -1608,17 +1267,6 @@ function OnlineConsultation() {
             >
               <VideoIcon size={18} />
               <span>{cameraOn ? "Stop Cam" : "Start Cam"}</span>
-            </button>
-
-            {/* STREAM MODE TOGGLE */}
-            <button
-              type="button"
-              className={`dock-btn ${useVirtualStream ? "active-tab" : ""}`}
-              onClick={toggleStreamMode}
-              title={useVirtualStream ? "Switch to Hardware Webcam" : "Switch to Cyber Clinical Live Stream"}
-            >
-              <SparklesIcon size={18} />
-              <span>{useVirtualStream ? "Cyber Stream" : "Hardware Cam"}</span>
             </button>
 
             {/* SCREEN SHARE */}
