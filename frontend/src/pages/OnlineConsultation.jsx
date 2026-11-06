@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import "./OnlineConsultation.css";
 import PrescriptionQRCode from "../components/PrescriptionQRCode";
+import RatingModal from "../components/RatingModal";
 import {
   ActivityIcon,
   AlertCircleIcon,
@@ -65,6 +66,7 @@ function OnlineConsultation() {
   const [participantConnected, setParticipantConnected] = useState(false);
   const [participantCount, setParticipantCount] = useState(1);
   const [signalingStatus, setSignalingStatus] = useState("waiting");
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   // Active drawer tab: null (closed), 'dossier', 'prescription', 'chat'
   const [activeDrawer, setActiveDrawer] = useState(null);

@@ -19,13 +19,15 @@ import OnlineConsultation from "./pages/OnlineConsultation";
 import PatientProfile from "./pages/PatientProfile";
 import DoctorVerification from "./pages/DoctorVerification";
 import AdminDashboard from "./pages/AdminDashboard";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
         <Route path="/" element={<App />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -96,5 +98,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         />
       </Routes>
     </BrowserRouter>
-  </React.StrictMode>
+  </ErrorBoundary>
+</React.StrictMode>
 );
