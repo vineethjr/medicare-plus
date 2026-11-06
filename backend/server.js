@@ -130,40 +130,29 @@ io.on("connection", (socket) => {
   });
 
   // ======================================
-  // WEBRTC OFFER (supports both "webrtc-offer" and "offer")
+  // WEBRTC SIGNALING (SINGLE CLEAN BROADCAST)
   // ======================================
 
   const handleOffer = ({ appointmentId, offer }) => {
     const roomId = `consultation-${appointmentId}`;
     socket.to(roomId).emit("webrtc-offer", { offer, senderId: socket.id });
-    socket.to(roomId).emit("offer", { offer, senderId: socket.id });
   };
   socket.on("webrtc-offer", handleOffer);
   socket.on("offer", handleOffer);
 
-  // ======================================
-  // WEBRTC ANSWER (supports both "webrtc-answer" and "answer")
-  // ======================================
-
   const handleAnswer = ({ appointmentId, answer }) => {
     const roomId = `consultation-${appointmentId}`;
     socket.to(roomId).emit("webrtc-answer", { answer, senderId: socket.id });
-    socket.to(roomId).emit("answer", { answer, senderId: socket.id });
   };
   socket.on("webrtc-answer", handleAnswer);
   socket.on("answer", handleAnswer);
 
-  // ======================================
-  // ICE CANDIDATE (supports both "ice-candidate" and "webrtc-ice-candidate")
-  // ======================================
-
   const handleCandidate = ({ appointmentId, candidate }) => {
     const roomId = `consultation-${appointmentId}`;
-    socket.to(roomId).emit("ice-candidate", { candidate, senderId: socket.id });
     socket.to(roomId).emit("webrtc-ice-candidate", { candidate, senderId: socket.id });
   };
-  socket.on("ice-candidate", handleCandidate);
   socket.on("webrtc-ice-candidate", handleCandidate);
+  socket.on("ice-candidate", handleCandidate);
 
   // ======================================
   // CONSULTATION CHAT

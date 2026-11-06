@@ -51,6 +51,89 @@ function readUser() {
   }
 }
 
+
+/**
+ * Creates a valid MediaStream fallback with a cyber-clinical canvas avatar track
+ * and silent Web Audio track so WebRTC P2P negotiation can always succeed
+ * even if camera is locked by another window or temporarily unavailable.
+ */
+function createFallbackStream(userName) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 640;
+  canvas.height = 480;
+  const ctx = canvas.getContext("2d");
+
+  function renderAvatar() {
+    ctx.fillStyle = "#071217";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Glowing circle
+    ctx.beginPath();
+    ctx.arc(320, 220, 85, 0, Math.PI * 2);
+    ctx.fillStyle = "#0e2933";
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(320, 220, 68, 0, Math.PI * 2);
+    ctx.fillStyle = "#0d9488";
+    ctx.fill();
+
+    // Initial
+    const initial = (userName || "P").charAt(0).toUpperCase();
+    ctx.font = "bold 52px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(initial, 320, 220);
+
+    // Name & status
+    ctx.font = "600 16px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = "#2dd4bf";
+    ctx.fillText(userName || "Participant", 320, 335);
+
+    ctx.font = "400 13px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = "#64748b";
+    ctx.fillText("Audio-Only / Avatar Mode Active", 320, 360);
+  }
+
+  renderAvatar();
+  let videoTrack = null;
+  try {
+    const stream = canvas.captureStream ? canvas.captureStream(10) : null;
+    if (stream) {
+      videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) videoTrack._isVirtual = true;
+    }
+  } catch (err) {
+    console.warn("Could not capture canvas stream:", err);
+  }
+
+  // Silent audio track using AudioContext
+  let audioTrack = null;
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      const audioCtx = new AudioContextClass();
+      const dest = audioCtx.createMediaStreamDestination();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      gain.gain.value = 0; // completely silent
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start();
+      audioTrack = dest.stream.getAudioTracks()[0];
+      if (audioTrack) audioTrack._isVirtual = true;
+    }
+  } catch (err) {
+    console.warn("Could not create fallback audio track:", err);
+  }
+
+  const tracks = [];
+  if (videoTrack) tracks.push(videoTrack);
+  if (audioTrack) tracks.push(audioTrack);
+  return new MediaStream(tracks);
+}
+
 function OnlineConsultation() {
   const { appointmentId } = useParams();
   const navigate = useNavigate();
@@ -281,10 +364,14 @@ function OnlineConsultation() {
     const pc = new RTCPeerConnection(rtcConfiguration);
     peerConnectionRef.current = pc;
 
-    // Attach local stream audio & video tracks
+    // Attach local stream tracks (real or avatar fallback)
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => {
-        pc.addTrack(track, localStreamRef.current);
+        try {
+          pc.addTrack(track, localStreamRef.current);
+        } catch (e) {
+          console.warn("Could not add track to pc:", e);
+        }
       });
     }
 
@@ -303,22 +390,20 @@ function OnlineConsultation() {
           currentStream.addTrack(event.track);
         }
         remoteVideoRef.current.play().catch((err) => {
-          console.log("Remote video autoplay suppressed:", err);
+          console.log("Remote video autoplay note:", err);
         });
       }
       setParticipantConnected(true);
       setSignalingStatus("connected");
     };
 
-    // ICE Candidate generation -> broadcast to room
+    // ICE Candidate generation -> broadcast cleanly once to room
     pc.onicecandidate = (event) => {
       if (event.candidate && socketRef.current?.connected) {
-        const payload = {
+        socketRef.current.emit("webrtc-ice-candidate", {
           appointmentId,
           candidate: event.candidate,
-        };
-        socketRef.current.emit("webrtc-ice-candidate", payload);
-        socketRef.current.emit("ice-candidate", payload);
+        });
       }
     };
 
@@ -328,8 +413,11 @@ function OnlineConsultation() {
       if (pc.connectionState === "connected") {
         setParticipantConnected(true);
         setSignalingStatus("connected");
-      } else if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
-        setParticipantConnected(false);
+      } else if (["disconnected", "failed"].includes(pc.connectionState)) {
+        console.warn("WebRTC connection disconnected/failed, attempting iceRestart");
+        if (pc.restartIce && isDoctor) {
+          pc.restartIce();
+        }
       }
     };
 
@@ -340,7 +428,9 @@ function OnlineConsultation() {
         setSignalingStatus("connected");
       } else if (pc.iceConnectionState === "failed") {
         console.warn("ICE connection failed, triggering iceRestart");
-        if (pc.restartIce) pc.restartIce();
+        if (pc.restartIce && isDoctor) {
+          pc.restartIce();
+        }
       }
     };
 
@@ -373,16 +463,14 @@ function OnlineConsultation() {
       });
       await pc.setLocalDescription(offer);
 
-      const payload = { appointmentId, offer };
-      socketRef.current?.emit("webrtc-offer", payload);
-      socketRef.current?.emit("offer", payload);
+      socketRef.current?.emit("webrtc-offer", { appointmentId, offer });
       console.log("WebRTC offer dispatched to consultation room");
     } catch (err) {
       console.error("Error creating WebRTC offer:", err);
     } finally {
       setTimeout(() => {
         isInitiatingRef.current = false;
-      }, 1200);
+      }, 1000);
     }
   }
 
@@ -394,24 +482,33 @@ function OnlineConsultation() {
       console.log("Patient received WebRTC offer. Creating answer...");
       setSignalingStatus("connecting");
       const pc = createPeerConnection();
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
-      // Flush any queued ICE candidates that arrived before remoteDescription
+      if (pc.signalingState !== "stable") {
+        await Promise.all([
+          pc.setLocalDescription({ type: "rollback" }).catch(() => {}),
+          pc.setRemoteDescription(new RTCSessionDescription(offer)),
+        ]);
+      } else {
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      }
+
+      // Flush queued candidates
       while (iceCandidateQueueRef.current.length > 0) {
         const queuedCandidate = iceCandidateQueueRef.current.shift();
         try {
           await pc.addIceCandidate(new RTCIceCandidate(queuedCandidate));
         } catch (e) {
-          console.warn("Error adding queued ICE candidate:", e);
+          console.warn("Error adding queued candidate:", e);
         }
       }
 
-      const answer = await pc.createAnswer();
+      const answer = await pc.createAnswer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
       await pc.setLocalDescription(answer);
 
-      const payload = { appointmentId, answer };
-      socketRef.current?.emit("webrtc-answer", payload);
-      socketRef.current?.emit("answer", payload);
+      socketRef.current?.emit("webrtc-answer", { appointmentId, answer });
       console.log("WebRTC answer dispatched to doctor");
     } catch (err) {
       console.error("Error processing WebRTC offer:", err);
@@ -425,16 +522,16 @@ function OnlineConsultation() {
     try {
       console.log("Doctor received WebRTC answer.");
       const pc = peerConnectionRef.current;
-      if (pc && pc.signalingState !== "stable") {
+      if (pc && pc.signalingState === "have-local-offer") {
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
 
-        // Flush queued ICE candidates
+        // Flush queued candidates
         while (iceCandidateQueueRef.current.length > 0) {
           const queuedCandidate = iceCandidateQueueRef.current.shift();
           try {
             await pc.addIceCandidate(new RTCIceCandidate(queuedCandidate));
           } catch (e) {
-            console.warn("Error adding queued ICE candidate:", e);
+            console.warn("Error adding queued candidate:", e);
           }
         }
         console.log("Doctor successfully set remote description from answer");
@@ -446,6 +543,10 @@ function OnlineConsultation() {
 
   async function handleReceiveCandidate({ candidate }) {
     if (!candidate) return;
+    const candKey = typeof candidate === "string" ? candidate : candidate.candidate;
+    if (candKey && seenCandidatesRef.current.has(candKey)) return;
+    if (candKey) seenCandidatesRef.current.add(candKey);
+
     try {
       const pc = peerConnectionRef.current;
       if (!pc || !pc.remoteDescription || !pc.remoteDescription.type) {
@@ -459,47 +560,143 @@ function OnlineConsultation() {
   }
 
   // --------------------------------------------------
-  // CAMERA & MICROPHONE
+  // PROGRESSIVE CAMERA & MICROPHONE CAPTURE
   // --------------------------------------------------
   async function startMedia() {
+    setMediaError("");
+    let stream = null;
+
+    // 1. Try real video + audio
     try {
-      setMediaError("");
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: true,
       });
+      setCameraOn(true);
+      setMicOn(true);
+      console.log("Acquired real hardware camera & microphone");
+    } catch (err1) {
+      console.warn("Full camera+audio capture failed, trying audio-only fallback:", err1.message);
 
-      localStreamRef.current = stream;
+      // 2. Try real audio only + fallback virtual avatar video
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const fallback = createFallbackStream(user.name || (isDoctor ? "Doctor" : "Patient"));
+        const tracks = [...audioStream.getAudioTracks(), ...fallback.getVideoTracks()];
+        stream = new MediaStream(tracks);
+        setCameraOn(false);
+        setMicOn(true);
+        setMediaError("Camera is busy in another window or denied. Audio is live (Avatar mode). Click 'Start Cam' to retry.");
+        console.log("Acquired real microphone with avatar video stream");
+      } catch (err2) {
+        console.warn("Audio-only capture also failed, using full clinical virtual fallback:", err2.message);
 
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        localVideoRef.current.muted = true;
-        localVideoRef.current.play().catch(() => {});
+        // 3. Fallback: virtual avatar video + silent audio so WebRTC connection never fails
+        stream = createFallbackStream(user.name || (isDoctor ? "Doctor" : "Patient"));
+        setCameraOn(false);
+        setMicOn(false);
+        setMediaError("Camera & microphone unavailable or in use by another window. Connected in avatar mode. Click 'Start Cam' or 'Unmute' to enable.");
       }
+    }
 
-      // If peer connection already instantiated, ensure tracks attached
-      if (peerConnectionRef.current) {
-        stream.getTracks().forEach((track) => {
+    localStreamRef.current = stream;
+
+    if (localVideoRef.current && stream) {
+      localVideoRef.current.srcObject = stream;
+      localVideoRef.current.muted = true;
+      localVideoRef.current.play().catch(() => {});
+    }
+
+    // Attach to existing peer connection if already instantiated
+    if (peerConnectionRef.current && stream) {
+      stream.getTracks().forEach((track) => {
+        try {
           const senders = peerConnectionRef.current.getSenders();
-          const alreadyAdded = senders.some((s) => s.track === track);
+          const alreadyAdded = senders.some((s) => s.track && s.track.id === track.id);
           if (!alreadyAdded) {
             peerConnectionRef.current.addTrack(track, stream);
           }
-        });
+        } catch (e) {
+          console.warn("Error attaching track to pc:", e);
+        }
+      });
+    }
+
+    return stream;
+  }
+
+  // Hot-swap hardware camera into ongoing call
+  async function requestCameraAccess() {
+    try {
+      setMediaError("");
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      if (!newVideoTrack) return;
+
+      if (localStreamRef.current) {
+        const oldTrack = localStreamRef.current.getVideoTracks()[0];
+        if (oldTrack) {
+          oldTrack.stop();
+          localStreamRef.current.removeTrack(oldTrack);
+        }
+        localStreamRef.current.addTrack(newVideoTrack);
       }
 
-      setCameraOn(stream.getVideoTracks().some((t) => t.enabled));
-      setMicOn(stream.getAudioTracks().some((t) => t.enabled));
-      return stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+        localVideoRef.current.play().catch(() => {});
+      }
+
+      if (peerConnectionRef.current) {
+        const sender = peerConnectionRef.current.getSenders().find((s) => s.track && s.track.kind === "video");
+        if (sender) {
+          await sender.replaceTrack(newVideoTrack);
+        } else if (localStreamRef.current) {
+          peerConnectionRef.current.addTrack(newVideoTrack, localStreamRef.current);
+        }
+      }
+
+      setCameraOn(true);
+      setMediaError("");
+      console.log("Hardware camera activated and hot-swapped into consultation");
     } catch (err) {
-      setMediaError(
-        err.name === "NotAllowedError"
-          ? "Camera or microphone permission was denied. Allow access in your browser settings."
-          : "Unable to access camera or microphone."
-      );
-      setMicOn(false);
-      setCameraOn(false);
-      return null;
+      setMediaError("Could not start camera: " + (err.message || "Device busy or permission denied"));
+    }
+  }
+
+  // Hot-swap hardware microphone into ongoing call
+  async function requestMicrophoneAccess() {
+    try {
+      setMediaError("");
+      const newStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const newAudioTrack = newStream.getAudioTracks()[0];
+      if (!newAudioTrack) return;
+
+      if (localStreamRef.current) {
+        const oldTrack = localStreamRef.current.getAudioTracks()[0];
+        if (oldTrack) {
+          oldTrack.stop();
+          localStreamRef.current.removeTrack(oldTrack);
+        }
+        localStreamRef.current.addTrack(newAudioTrack);
+      }
+
+      if (peerConnectionRef.current) {
+        const sender = peerConnectionRef.current.getSenders().find((s) => s.track && s.track.kind === "audio");
+        if (sender) {
+          await sender.replaceTrack(newAudioTrack);
+        } else if (localStreamRef.current) {
+          peerConnectionRef.current.addTrack(newAudioTrack, localStreamRef.current);
+        }
+      }
+
+      setMicOn(true);
+      setMediaError("");
+      console.log("Hardware microphone activated and hot-swapped into consultation");
+    } catch (err) {
+      setMediaError("Could not start microphone: " + (err.message || "Permission denied"));
     }
   }
 
@@ -511,6 +708,16 @@ function OnlineConsultation() {
 
     let cancelled = false;
     let socket;
+
+    function triggerNegotiation() {
+      if (!isDoctor) return;
+      if (negotiationTimeoutRef.current) {
+        clearTimeout(negotiationTimeoutRef.current);
+      }
+      negotiationTimeoutRef.current = setTimeout(() => {
+        initiateOffer();
+      }, 400);
+    }
 
     async function connectConsultation() {
       try {
@@ -537,7 +744,7 @@ function OnlineConsultation() {
           console.log("Telehealth room status:", count, "participants");
           setParticipantCount(count || 1);
           if (count >= 2 && isDoctor) {
-            initiateOffer();
+            triggerNegotiation();
           }
         });
 
@@ -545,7 +752,7 @@ function OnlineConsultation() {
           console.log("Participant joined room:", newUser?.name);
           setParticipantCount((prev) => Math.max(prev, count || 2));
           if (isDoctor) {
-            initiateOffer();
+            triggerNegotiation();
           }
         });
 
@@ -553,18 +760,13 @@ function OnlineConsultation() {
           console.log("Ready for call signal received. Count:", count);
           setParticipantCount((prev) => Math.max(prev, count || 2));
           if (isDoctor) {
-            initiateOffer();
+            triggerNegotiation();
           }
         });
 
-        // Dual event listeners for offer, answer, and candidates
+        // Single clean listeners for signaling
         socket.on("webrtc-offer", handleReceiveOffer);
-        socket.on("offer", handleReceiveOffer);
-
         socket.on("webrtc-answer", handleReceiveAnswer);
-        socket.on("answer", handleReceiveAnswer);
-
-        socket.on("ice-candidate", handleReceiveCandidate);
         socket.on("webrtc-ice-candidate", handleReceiveCandidate);
 
         socket.on("participant-left", () => {
@@ -580,6 +782,7 @@ function OnlineConsultation() {
             peerConnectionRef.current = null;
           }
           iceCandidateQueueRef.current = [];
+          seenCandidatesRef.current.clear();
         });
       } catch (err) {
         console.error("Signaling error:", err);
@@ -590,6 +793,9 @@ function OnlineConsultation() {
 
     return () => {
       cancelled = true;
+      if (negotiationTimeoutRef.current) {
+        clearTimeout(negotiationTimeoutRef.current);
+      }
       if (socket) {
         socket.emit("leave-consultation", { appointmentId });
         socket.disconnect();
@@ -604,26 +810,37 @@ function OnlineConsultation() {
         peerConnectionRef.current.close();
       }
       iceCandidateQueueRef.current = [];
+      seenCandidatesRef.current.clear();
     };
   }, [appointment, appointmentId, isDoctor, token]);
 
   // CONTROLS
   function toggleMicrophone() {
-    if (!localStreamRef.current) return;
-    const audioTrack = localStreamRef.current.getAudioTracks()[0];
-    if (audioTrack) {
-      audioTrack.enabled = !audioTrack.enabled;
-      setMicOn(audioTrack.enabled);
+    if (!localStreamRef.current) {
+      requestMicrophoneAccess();
+      return;
     }
+    const audioTrack = localStreamRef.current.getAudioTracks()[0];
+    if (!audioTrack || audioTrack._isVirtual) {
+      requestMicrophoneAccess();
+      return;
+    }
+    audioTrack.enabled = !audioTrack.enabled;
+    setMicOn(audioTrack.enabled);
   }
 
   function toggleCamera() {
-    if (!localStreamRef.current) return;
-    const videoTrack = localStreamRef.current.getVideoTracks()[0];
-    if (videoTrack) {
-      videoTrack.enabled = !videoTrack.enabled;
-      setCameraOn(videoTrack.enabled);
+    if (!localStreamRef.current) {
+      requestCameraAccess();
+      return;
     }
+    const videoTrack = localStreamRef.current.getVideoTracks()[0];
+    if (!videoTrack || videoTrack._isVirtual) {
+      requestCameraAccess();
+      return;
+    }
+    videoTrack.enabled = !videoTrack.enabled;
+    setCameraOn(videoTrack.enabled);
   }
 
   async function shareScreen() {
@@ -934,9 +1151,27 @@ function OnlineConsultation() {
 
           {/* MEDIA ERROR BANNER */}
           {mediaError && (
-            <div className="stage-media-alert">
-              <AlertCircleIcon size={18} />
-              <span>{mediaError}</span>
+            <div className="stage-media-alert" style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <AlertCircleIcon size={18} />
+                <span>{mediaError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={startMedia}
+                style={{
+                  background: "#ffffff",
+                  color: "#0f172a",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "4px 10px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                🔄 Retry Camera / Mic
+              </button>
             </div>
           )}
 
